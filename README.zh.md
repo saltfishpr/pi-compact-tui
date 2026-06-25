@@ -28,6 +28,12 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 - **右侧** — 会话费用（美元）、上下文窗口使用情况（百分比和 token 数量）以及自动压缩指示器 `(auto)`。
 - **对齐** — 左右内容会间隔开，并根据终端宽度智能截断以适配。
 
+### Clear Command
+
+注册 `/clear` 斜杠命令，作为开启新会话的快捷方式。
+
+- `/clear` — `/new` 的别名：立即启动一个新会话，等同于 `ctx.newSession()`。
+
 ## License
 
 MIT

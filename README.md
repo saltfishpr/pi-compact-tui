@@ -28,6 +28,12 @@ Replaces the default footer with a single-line status bar that surfaces the info
 - **Right side** — session cost in dollars, context window usage (percentage and token count), and auto-compaction indicator `(auto)`.
 - **Alignment** — left and right content are spaced apart and truncated intelligently to fit any terminal width.
 
+### Clear Command
+
+Registers the `/clear` slash command as a shortcut for starting a fresh session.
+
+- `/clear` — alias for `/new`: starts a new session immediately, equivalent to `ctx.newSession()`.
+
 ## License
 
 MIT
