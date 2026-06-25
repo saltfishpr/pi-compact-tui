@@ -36,9 +36,9 @@ function fitBorder(
 
 class CompactEditor extends CustomEditor {
   private uiTheme: Theme;
+  private workingMessage: string;
   private workingLoader: Loader;
   private isWorking: boolean;
-  private workingMessage: string;
   private model: string;
 
   constructor(tui: TUI, theme: EditorTheme, keybindings: KeybindingsManager, uiTheme: Theme, model = "") {

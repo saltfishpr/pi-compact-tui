@@ -18,7 +18,8 @@
   "pi": {
     "extensions": [
       "./packages/pi-compact-editor/index.ts",
-      "./packages/pi-compact-footer/index.ts"
+      "./packages/pi-compact-footer/index.ts",
+      "./packages/pi-clear-command/index.ts"
     ]
   },
   "scripts": {
