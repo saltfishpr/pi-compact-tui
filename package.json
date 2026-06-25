@@ -1,7 +1,7 @@
 {
   "name": "pi-compact-tui",
   "version": "0.1.0",
-  "description": "",
+  "description": "Pi extension bundle with compact, distraction-free editor and footer components for a focused coding experience",
   "keywords": [
     "pi-agent"
   ],
@@ -17,7 +17,8 @@
   },
   "pi": {
     "extensions": [
-      "./packages/pi-compact-editor/index.ts"
+      "./packages/pi-compact-editor/index.ts",
+      "./packages/pi-compact-footer/index.ts"
     ]
   },
   "scripts": {
