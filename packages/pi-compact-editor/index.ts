@@ -36,7 +36,6 @@ function fitBorder(
 
 class CompactEditor extends CustomEditor {
   private uiTheme: Theme;
-  private workingMessage: string;
   private workingLoader: Loader;
   private isWorking: boolean;
   private model: string;
@@ -56,31 +55,24 @@ class CompactEditor extends CustomEditor {
     );
     this.workingLoader.stop();
     this.isWorking = false;
-    this.workingMessage = "";
     this.model = model;
   }
 
   startWorking(message: string = "Working") {
     this.isWorking = true;
-    this.workingLoader.start();
-    this.workingMessage = message;
     this.workingLoader.setMessage(message);
-    this.tui.requestRender();
+    this.workingLoader.start();
   }
 
   stopWorking() {
     this.isWorking = false;
     this.workingLoader.stop();
-    this.workingMessage = "";
     this.workingLoader.setMessage("");
-    this.tui.requestRender();
   }
 
   setWorkingMessage(message: string) {
-    if (this.workingMessage === message) return;
-    this.workingMessage = message;
+    if (!this.isWorking) return;
     this.workingLoader.setMessage(message);
-    this.tui.requestRender();
   }
 
   setModel(model: string) {
@@ -102,9 +94,7 @@ class CompactEditor extends CustomEditor {
   }
 
   private renderWorkingLoader(width: number): string {
-    const lines = this.workingLoader.render(width);
-    const line = lines.find((l) => l.trim().length > 0);
-    return line ? line.trim() : "";
+    return this.workingLoader.render(width).join("").trim();
   }
 
   private fitLabel(text: string): string {
@@ -135,7 +125,7 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("agent_start", () => {
     runningTools.clear();
-    editor?.startWorking("Working");
+    editor?.startWorking();
   });
 
   pi.on("turn_start", () => {
