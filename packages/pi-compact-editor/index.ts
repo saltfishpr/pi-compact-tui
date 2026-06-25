@@ -110,7 +110,7 @@ export default function (pi: ExtensionAPI) {
     if (ctx.mode !== "tui") return;
 
     ctx.ui.setWorkingVisible(false);
-    const model = formatModel(ctx.model);
+    const model = formatModel(ctx.model, pi.getThinkingLevel());
     ctx.ui.setEditorComponent((tui, theme, keybindings) => {
       editor = new CompactEditor(tui, theme, keybindings, ctx.ui.theme, model);
       return editor;
@@ -120,7 +120,13 @@ export default function (pi: ExtensionAPI) {
   pi.on("model_select", (event, ctx) => {
     if (ctx.mode !== "tui") return;
 
-    editor?.setModel(formatModel(event.model));
+    editor?.setModel(formatModel(event.model, pi.getThinkingLevel()));
+  });
+
+  pi.on("thinking_level_select", (event, ctx) => {
+    if (ctx.mode !== "tui") return;
+
+    editor?.setModel(formatModel(ctx.model, event.level));
   });
 
   pi.on("agent_start", () => {
@@ -180,6 +186,8 @@ export default function (pi: ExtensionAPI) {
   });
 }
 
-function formatModel(model: { provider: string; id: string } | undefined): string {
-  return model ? `(${model.provider}) ${model.id}` : "";
+function formatModel(model: { provider: string; id: string } | undefined, thinkingLevel = ""): string {
+  const base = model ? `(${model.provider}) ${model.id}` : "";
+  const level = thinkingLevel && thinkingLevel !== "off" ? ` • ${thinkingLevel}` : "";
+  return `${base}${level}`;
 }
