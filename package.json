@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Pi extension bundle with compact, distraction-free editor and footer components for a focused coding experience",
   "keywords": [
-    "pi-agent"
+    "pi-package"
   ],
   "repository": {
     "type": "git",
