@@ -10,7 +10,7 @@ Install from git:
 pi install git:github.com/saltfishpr/pi-compact-tui
 ```
 
-## Features
+## Extensions
 
 ### Compact Editor
 
@@ -33,6 +33,34 @@ Replaces the default footer with a single-line status bar that surfaces the info
 Registers the `/clear` slash command as a shortcut for starting a fresh session.
 
 - `/clear` — alias for `/new`: starts a new session immediately, equivalent to `ctx.newSession()`.
+
+### Provider Proxy
+
+Automatically sets `HTTP_PROXY` / `HTTPS_PROXY` based on the active model provider, useful when different providers need different proxy configurations (e.g., accessing OpenAI behind a VPN while using a local Ollama).
+
+- **Per-provider proxy** — maps provider names to proxy URLs in a JSON config file.
+- **Catch-all fallback** — use `"*"` as a default proxy for any unmatched provider.
+- **Auto-apply** — proxy is set on session start and model switch; cleared on session shutdown.
+
+Configuration file (project-level takes precedence over global):
+
+```jsonc
+// ~/.pi/agent/extensions/proxy.json  (global)
+// .pi/extensions/proxy.json          (project)
+{
+  "proxies": {
+    "*": "http://127.0.0.1:20172",
+    "openai": "http://127.0.0.1:7890",
+    "ollama": ""
+  }
+}
+```
+
+Setting a provider to `""` explicitly clears the proxy for that provider.
+
+### Commit Prompt
+
+A built-in prompt template (`/commit`) that automates git commits. It gathers the current git status, diff, branch, and recent commit history, then instructs the agent to stage and commit in a single step.
 
 ## License
 

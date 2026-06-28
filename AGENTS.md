@@ -13,7 +13,10 @@ pi-compact-tui/
 ├── packages/
 │   ├── pi-compact-editor/index.ts   # 自定义编辑器（CustomEditor 子类）
 │   ├── pi-compact-footer/index.ts   # 自定义底部状态栏（setFooter）
-│   └── pi-clear-command/index.ts    # /clear 命令（registerCommand）
+│   ├── pi-clear-command/index.ts    # /clear 命令（registerCommand）
+│   └── pi-provider-proxy/           # 按 provider 自动设置代理
+├── prompts/
+│   └── commit.md                    # /commit 提示词模板
 ├── package.json                     # pi package 清单 + workspace 配置
 └── pnpm-workspace.yaml
 ```

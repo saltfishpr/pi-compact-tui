@@ -19,7 +19,8 @@
     "extensions": [
       "./packages/pi-compact-editor/index.ts",
       "./packages/pi-compact-footer/index.ts",
-      "./packages/pi-clear-command/index.ts"
+      "./packages/pi-clear-command/index.ts",
+      "./packages/pi-provider-proxy/index.ts"
     ],
     "prompts": [
       "./prompts"
@@ -28,7 +29,10 @@
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {},
+  "dependencies": {
+    "defu": "^6.1.7",
+    "zod": "^4.4.3"
+  },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",

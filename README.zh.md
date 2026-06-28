@@ -10,7 +10,7 @@
 pi install git:github.com/saltfishpr/pi-compact-tui
 ```
 
-## Features
+## 扩展
 
 ### Compact Editor
 
@@ -33,6 +33,31 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 注册 `/clear` 斜杠命令，作为开启新会话的快捷方式。
 
 - `/clear` — `/new` 的别名：立即启动一个新会话，等同于 `ctx.newSession()`。
+
+### Provider Proxy
+
+根据当前使用的模型 provider 自动设置 `HTTP_PROXY` / `HTTPS_PROXY`，适用于不同 provider 需要不同代理配置的场景（例如通过 VPN 访问 OpenAI，同时使用本地 Ollama）。
+
+- **按 provider 代理** — 在 JSON 配置文件中将 provider 名称映射到代理 URL。
+- **通配回退** — 使用 `"*"` 作为未匹配 provider 的默认代理。
+- **自动生效** — 会话启动和模型切换时自动设置代理，会话关闭时清除。
+
+配置文件（项目级优先于全局）：
+
+```jsonc
+// ~/.pi/agent/extensions/proxy.json  （全局）
+// .pi/extensions/proxy.json          （项目）
+{
+  "proxies": {
+    "*": "http://127.0.0.1:7890",
+    "openai": "http://127.0.0.1:7890",
+  }
+}
+```
+
+### Commit Prompt
+
+内置的提示词模板（`/commit`），用于自动化 git 提交。它会收集当前 git 状态、diff、分支和最近的提交历史，然后指示 agent 一步完成暂存和提交。
 
 ## License
 
