@@ -20,6 +20,9 @@
       "./packages/pi-compact-editor/index.ts",
       "./packages/pi-compact-footer/index.ts",
       "./packages/pi-clear-command/index.ts"
+    ],
+    "prompts": [
+      "./prompts"
     ]
   },
   "scripts": {
@@ -35,6 +38,7 @@
     "@earendil-works/pi-ai": "^0.80.2",
     "@earendil-works/pi-coding-agent": "^0.80.2",
     "@earendil-works/pi-tui": "^0.80.2",
+    "@types/node": "^26.0.1",
     "typescript": "^6.0.3"
   }
 }
