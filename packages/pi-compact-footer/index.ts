@@ -1,6 +1,4 @@
 import {
-  CONFIG_DIR_NAME,
-  getAgentDir,
   type ExtensionAPI,
   type ExtensionContext,
   type ReadonlyFooterDataProvider,
@@ -8,74 +6,8 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { Component, TUI } from "@earendil-works/pi-tui";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import { existsSync, readFileSync } from "node:fs";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
-
-type ElementKey =
-  | "pwd"
-  | "branch"
-  | "sessionName"
-  | "inputTokens"
-  | "outputTokens"
-  | "cacheReadTokens"
-  | "cacheWriteTokens"
-  | "cacheHitRate"
-  | "cost"
-  | "context"
-  | "provider"
-  | "model"
-  | "thinkingLevel"
-  | "extensionStatuses";
-
-interface LineConfig {
-  left?: ElementKey[];
-  right?: ElementKey[];
-}
-
-interface Settings {
-  /** Separator between adjacent items in the same align group. Defaults to " ". */
-  separator?: string;
-  /**
-   * Ordered list of lines. Each line has independent `left` and `right` arrays.
-   * The order of keys within an array defines their display order.
-   * Elements not appearing in any line are hidden.
-   */
-  lines?: LineConfig[];
-}
-
-const DEFAULT_SETTINGS: Settings = {
-  separator: " ",
-  lines: [
-    {
-      left: ["pwd", "branch", "sessionName"],
-      right: ["cacheHitRate", "cost", "context"],
-    },
-    { left: ["extensionStatuses"] },
-  ],
-};
-
-const CONFIG_FILE = "pi-compact-footer.json";
-
-function loadSettings(cwd: string): Settings {
-  const candidates: string[] = [];
-  try {
-    candidates.push(join(getAgentDir(), CONFIG_FILE));
-  } catch {}
-  candidates.push(join(cwd, CONFIG_DIR_NAME, CONFIG_FILE));
-
-  let merged: Settings | undefined;
-  for (const path of candidates) {
-    if (!existsSync(path)) continue;
-    try {
-      const raw = JSON.parse(readFileSync(path, "utf8")) as Settings;
-      merged = {
-        separator: raw.separator ?? merged?.separator,
-        lines: raw.lines ?? merged?.lines,
-      };
-    } catch {}
-  }
-  return merged ?? DEFAULT_SETTINGS;
-}
+import { isAbsolute, relative, resolve, sep } from "node:path";
+import { loadConfig, type ElementKey, type FooterConfig } from "./config";
 
 function sanitizeStatusText(text: string): string {
   return text
@@ -140,10 +72,10 @@ function dim(theme: Theme, text: string): string {
 }
 
 class ConfigurableFooter implements Component {
-  private settings: Settings;
   private ctx: ExtensionContext;
   private footerData: ReadonlyFooterDataProvider;
   private theme: Theme;
+  private config: FooterConfig;
   private autoCompactEnabled = true;
   private getThinkingLevel: () => string;
 
@@ -151,13 +83,13 @@ class ConfigurableFooter implements Component {
     ctx: ExtensionContext;
     footerData: ReadonlyFooterDataProvider;
     theme: Theme;
-    settings: Settings;
+    config: FooterConfig;
     getThinkingLevel: () => string;
   }) {
     this.ctx = opts.ctx;
     this.footerData = opts.footerData;
     this.theme = opts.theme;
-    this.settings = opts.settings;
+    this.config = opts.config;
     this.getThinkingLevel = opts.getThinkingLevel;
   }
 
@@ -237,8 +169,8 @@ class ConfigurableFooter implements Component {
 
   render(width: number): string[] {
     const built = this.buildAll();
-    const separator = this.settings.separator ?? " ";
-    const lineConfigs = this.settings.lines ?? [];
+    const separator = this.config.separator;
+    const lineConfigs = this.config.lines;
 
     const lines: string[] = [];
     for (const line of lineConfigs) {
@@ -280,13 +212,13 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_start", (_event, ctx) => {
     if (ctx.mode !== "tui") return;
 
-    const settings = loadSettings(ctx.cwd);
+    const config = loadConfig(ctx.cwd);
     ctx.ui.setFooter((_tui: TUI, theme: Theme, footerData: ReadonlyFooterDataProvider) => {
       return new ConfigurableFooter({
         ctx,
         footerData,
         theme,
-        settings,
+        config,
         getThinkingLevel: () => pi.getThinkingLevel(),
       });
     });

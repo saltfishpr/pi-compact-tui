@@ -22,11 +22,61 @@ Replaces the default editor with a streamlined one. The top border shows a worki
 
 ### Compact Footer
 
-Replaces the default footer with a single-line status bar that surfaces the information you care about.
+Replaces the default footer with a configurable multi-line status bar. Each line has independent left/right element groups; the two sides are padded apart and truncated intelligently to fit any terminal width.
 
-- **Left side** — current working directory (with `~` for home), git branch, and session name.
-- **Right side** — session cost in dollars, context window usage (percentage and token count), and auto-compaction indicator `(auto)`.
-- **Alignment** — left and right content are spaced apart and truncated intelligently to fit any terminal width.
+#### Elements
+
+| Key                 | Description                                                                                                             |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `pwd`               | Current working directory (with `~` for home).                                                                          |
+| `branch`            | Git branch, wrapped in parentheses.                                                                                     |
+| `sessionName`       | Current session name, prefixed with `•`.                                                                                |
+| `inputTokens`       | Cumulative input tokens (`↑`).                                                                                          |
+| `outputTokens`      | Cumulative output tokens (`↓`).                                                                                         |
+| `cacheReadTokens`   | Cumulative cache-read tokens (`R`).                                                                                     |
+| `cacheWriteTokens`  | Cumulative cache-write tokens (`W`).                                                                                    |
+| `cacheHitRate`      | Cache hit rate of the latest turn (`CH<pct>%`).                                                                         |
+| `cost`              | Session cost in USD; appends `(sub)` when using an OAuth subscription.                                                  |
+| `context`           | Context window usage `pct%/window` plus `(auto)` when auto-compaction is on. Colors as warning / error above 70% / 90%. |
+| `provider`          | Active provider, shown only when more than one is available.                                                            |
+| `model`             | Active model id.                                                                                                        |
+| `thinkingLevel`     | Reasoning level for models that support it (`• off` / `• <level>`).                                                     |
+| `extensionStatuses` | Aggregated status text emitted by other extensions.                                                                     |
+
+#### Configuration
+
+Config is loaded from `footer.json`, with project settings overriding global ones:
+
+- Project: `{cwd}/.pi/extensions/footer.json`
+- Global: `~/.pi/extensions/footer.json`
+
+Schema:
+
+```jsonc
+{
+  // separator inserted between elements on the same side
+  "separator": " ",
+  // ordered list of footer lines; each has independent left/right groups
+  "lines": [
+    { "left": ["pwd", "branch", "sessionName"], "right": ["cacheHitRate", "cost", "context"] },
+    { "left": ["extensionStatuses"] },
+  ],
+}
+```
+
+Arrays replace defaults entirely (no deep merge). Lines with no visible content are skipped, so you can safely list optional elements.
+
+Default layout:
+
+```jsonc
+{
+  "separator": " ",
+  "lines": [
+    { "left": ["pwd", "branch", "sessionName"], "right": ["cacheHitRate", "cost", "context"] },
+    { "left": ["extensionStatuses"] },
+  ],
+}
+```
 
 ### Clear Command
 

@@ -29,7 +29,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "defu": "^6.1.7",
     "zod": "^4.4.3"
   },
   "peerDependencies": {

@@ -22,11 +22,61 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 
 ### Compact Footer
 
-用单行状态栏替换默认页脚，展示你关心的信息。
+用可配置的多行状态栏替换默认页脚。每行有独立的左/右元素组，两侧会被拉开并根据终端宽度智能截断。
 
-- **左侧** — 当前工作目录（`~` 代表 home）、git 分支和会话名称。
-- **右侧** — 会话费用（美元）、上下文窗口使用情况（百分比和 token 数量）以及自动压缩指示器 `(auto)`。
-- **对齐** — 左右内容会间隔开，并根据终端宽度智能截断以适配。
+#### 元素
+
+| Key                 | 说明                                                                                                      |
+| ------------------- | --------------------------------------------------------------------------------------------------------- |
+| `pwd`               | 当前工作目录（home 显示为 `~`）。                                                                         |
+| `branch`            | Git 分支，以括号包裹。                                                                                    |
+| `sessionName`       | 当前会话名，前缀为 `•`。                                                                                  |
+| `inputTokens`       | 累计输入 token（`↑`）。                                                                                   |
+| `outputTokens`      | 累计输出 token（`↓`）。                                                                                   |
+| `cacheReadTokens`   | 累计缓存读取 token（`R`）。                                                                               |
+| `cacheWriteTokens`  | 累计缓存写入 token（`W`）。                                                                               |
+| `cacheHitRate`      | 最近一次的缓存命中率（`CH<pct>%`）。                                                                      |
+| `cost`              | 会话费用（美元）；使用 OAuth 订阅时追加 `(sub)`。                                                         |
+| `context`           | 上下文窗口使用 `pct%/window`，开启自动压缩时追加 `(auto)`。超过 70% / 90% 时会显示为 warning / error 色。 |
+| `provider`          | 当前 provider，仅当可用 provider 多于一个时显示。                                                         |
+| `model`             | 当前模型 id。                                                                                             |
+| `thinkingLevel`     | 支持推理的模型的推理级别（`• off` / `• <level>`）。                                                       |
+| `extensionStatuses` | 其他扩展上报的聚合状态文本。                                                                              |
+
+#### 配置
+
+配置从 `footer.json` 加载，项目级覆盖全局：
+
+- 项目级：`{cwd}/.pi/extensions/footer.json`
+- 全局级：`~/.pi/extensions/footer.json`
+
+Schema：
+
+```jsonc
+{
+  // 同一侧元素之间的分隔符
+  "separator": " ",
+  // 有序页脚行列表；每行独立配置左右两组
+  "lines": [
+    { "left": ["pwd", "branch", "sessionName"], "right": ["cacheHitRate", "cost", "context"] },
+    { "left": ["extensionStatuses"] },
+  ],
+}
+```
+
+数组语义为整体覆盖（不做深度合并）。没有任何可见内容的行会被跳过，因此可以放心列出可选元素。
+
+默认布局：
+
+```jsonc
+{
+  "separator": " ",
+  "lines": [
+    { "left": ["pwd", "branch", "sessionName"], "right": ["cacheHitRate", "cost", "context"] },
+    { "left": ["extensionStatuses"] },
+  ],
+}
+```
 
 ### Clear Command
 
