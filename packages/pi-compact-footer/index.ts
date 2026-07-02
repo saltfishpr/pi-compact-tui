@@ -3,79 +3,85 @@ import {
   getAgentDir,
   type ExtensionAPI,
   type ExtensionContext,
+  type ReadonlyFooterDataProvider,
+  type Theme,
 } from "@earendil-works/pi-coding-agent";
+import type { Component, TUI } from "@earendil-works/pi-tui";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { existsSync, readFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
-type Settings = {
-  compaction?: {
-    enabled?: boolean;
-  };
+type ElementKey =
+  | "pwd"
+  | "branch"
+  | "sessionName"
+  | "inputTokens"
+  | "outputTokens"
+  | "cacheReadTokens"
+  | "cacheWriteTokens"
+  | "cacheHitRate"
+  | "cost"
+  | "context"
+  | "provider"
+  | "model"
+  | "thinkingLevel"
+  | "extensionStatuses";
+
+interface LineConfig {
+  left?: ElementKey[];
+  right?: ElementKey[];
+}
+
+interface Settings {
+  /** Separator between adjacent items in the same align group. Defaults to " ". */
+  separator?: string;
+  /**
+   * Ordered list of lines. Each line has independent `left` and `right` arrays.
+   * The order of keys within an array defines their display order.
+   * Elements not appearing in any line are hidden.
+   */
+  lines?: LineConfig[];
+}
+
+const DEFAULT_SETTINGS: Settings = {
+  separator: " ",
+  lines: [
+    {
+      left: ["pwd", "branch", "sessionName"],
+      right: ["cacheHitRate", "cost", "context"],
+    },
+    { left: ["extensionStatuses"] },
+  ],
 };
 
-export default function (pi: ExtensionAPI) {
-  pi.on("session_start", (_event, ctx) => {
-    if (ctx.mode !== "tui") return;
+const CONFIG_FILE = "pi-compact-footer.json";
 
-    ctx.ui.setFooter((tui, theme, footerData) => ({
-      dispose: footerData.onBranchChange(() => tui.requestRender()),
-      invalidate() {},
-      render(width: number): string[] {
-        const pwd = formatCwd(ctx.sessionManager.getCwd());
-        const branch = footerData.getGitBranch();
-        const sessionName = ctx.sessionManager.getSessionName();
+function loadSettings(cwd: string): Settings {
+  const candidates: string[] = [];
+  try {
+    candidates.push(join(getAgentDir(), CONFIG_FILE));
+  } catch {}
+  candidates.push(join(cwd, CONFIG_DIR_NAME, CONFIG_FILE));
 
-        const left = sanitize(`${pwd}${branch ? ` (${branch})` : ""}${sessionName ? ` • ${sessionName}` : ""}`);
-        const right = sanitize(`${formatCost(ctx)} ${formatContext(ctx)}`);
-
-        return [theme.fg("dim", alignFooter(left, right, width))];
-      },
-    }));
-  });
-
-  pi.on("session_shutdown", (_event, ctx) => {
-    if (ctx.mode !== "tui") return;
-
-    ctx.ui.setFooter(undefined);
-  });
-}
-
-function formatCwd(cwd: string): string {
-  const home = process.env.HOME || process.env.USERPROFILE;
-  if (!home) return cwd;
-
-  const resolvedCwd = resolve(cwd);
-  const resolvedHome = resolve(home);
-  const relativeToHome = relative(resolvedHome, resolvedCwd);
-  const isInsideHome =
-    relativeToHome === "" ||
-    (relativeToHome !== ".." && !relativeToHome.startsWith(`..${sep}`) && !isAbsolute(relativeToHome));
-
-  if (!isInsideHome) return cwd;
-  return relativeToHome === "" ? "~" : `~${sep}${relativeToHome}`;
-}
-
-function formatCost(ctx: ExtensionContext): string {
-  let totalCost = 0;
-
-  for (const entry of ctx.sessionManager.getEntries()) {
-    if (entry.type !== "message" || entry.message.role !== "assistant") continue;
-    const cost = entry.message.usage?.cost?.total;
-    if (typeof cost === "number") totalCost += cost;
+  let merged: Settings | undefined;
+  for (const path of candidates) {
+    if (!existsSync(path)) continue;
+    try {
+      const raw = JSON.parse(readFileSync(path, "utf8")) as Settings;
+      merged = {
+        separator: raw.separator ?? merged?.separator,
+        lines: raw.lines ?? merged?.lines,
+      };
+    } catch {}
   }
-
-  const usingSubscription = ctx.model ? ctx.modelRegistry.isUsingOAuth(ctx.model) : false;
-  return `$${totalCost.toFixed(3)}${usingSubscription ? " (sub)" : ""}`;
+  return merged ?? DEFAULT_SETTINGS;
 }
 
-function formatContext(ctx: ExtensionContext): string {
-  const usage = ctx.getContextUsage();
-  const contextWindow = usage?.contextWindow ?? ctx.model?.contextWindow;
-  const percent = usage?.percent === null || usage?.percent === undefined ? "?" : `${Math.round(usage.percent)}%`;
-  const auto = isAutoCompactionEnabled(ctx) ? " (auto)" : "";
-
-  return `${percent}/${contextWindow ? formatTokens(contextWindow) : "?"}${auto}`;
+function sanitizeStatusText(text: string): string {
+  return text
+    .replace(/[\r\n\t]/g, " ")
+    .replace(/ +/g, " ")
+    .trim();
 }
 
 function formatTokens(count: number): string {
@@ -86,45 +92,208 @@ function formatTokens(count: number): string {
   return `${Math.round(count / 1000000)}M`;
 }
 
-function isAutoCompactionEnabled(ctx: ExtensionContext): boolean {
-  let enabled = readCompactionEnabled(join(getAgentDir(), "settings.json")) ?? true;
+function formatCwdForFooter(cwd: string, home: string | undefined): string {
+  if (!home) return cwd;
+  const resolvedCwd = resolve(cwd);
+  const resolvedHome = resolve(home);
+  const relativeToHome = relative(resolvedHome, resolvedCwd);
+  const isInsideHome =
+    relativeToHome === "" ||
+    (relativeToHome !== ".." && !relativeToHome.startsWith(`..${sep}`) && !isAbsolute(relativeToHome));
+  if (!isInsideHome) return cwd;
+  return relativeToHome === "" ? "~" : `~${sep}${relativeToHome}`;
+}
 
-  if (ctx.isProjectTrusted()) {
-    enabled = readCompactionEnabled(join(ctx.cwd, CONFIG_DIR_NAME, "settings.json")) ?? enabled;
+interface TokenStats {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  cost: number;
+  latestCacheHitRate: number | undefined;
+}
+
+function collectTokenStats(ctx: ExtensionContext): TokenStats {
+  let input = 0;
+  let output = 0;
+  let cacheRead = 0;
+  let cacheWrite = 0;
+  let cost = 0;
+  let latestCacheHitRate: number | undefined;
+  for (const entry of ctx.sessionManager.getEntries()) {
+    if (entry.type !== "message") continue;
+    if (entry.message.role !== "assistant") continue;
+    const usage = entry.message.usage;
+    input += usage.input;
+    output += usage.output;
+    cacheRead += usage.cacheRead;
+    cacheWrite += usage.cacheWrite;
+    cost += usage.cost.total;
+    const promptTokens = usage.input + usage.cacheRead + usage.cacheWrite;
+    latestCacheHitRate = promptTokens > 0 ? (usage.cacheRead / promptTokens) * 100 : undefined;
+  }
+  return { input, output, cacheRead, cacheWrite, cost, latestCacheHitRate };
+}
+
+function dim(theme: Theme, text: string): string {
+  return theme.fg("dim", text);
+}
+
+class ConfigurableFooter implements Component {
+  private settings: Settings;
+  private ctx: ExtensionContext;
+  private footerData: ReadonlyFooterDataProvider;
+  private theme: Theme;
+  private autoCompactEnabled = true;
+  private getThinkingLevel: () => string;
+
+  constructor(opts: {
+    ctx: ExtensionContext;
+    footerData: ReadonlyFooterDataProvider;
+    theme: Theme;
+    settings: Settings;
+    getThinkingLevel: () => string;
+  }) {
+    this.ctx = opts.ctx;
+    this.footerData = opts.footerData;
+    this.theme = opts.theme;
+    this.settings = opts.settings;
+    this.getThinkingLevel = opts.getThinkingLevel;
   }
 
-  return enabled;
-}
+  setAutoCompactEnabled(enabled: boolean): void {
+    this.autoCompactEnabled = enabled;
+  }
 
-function readCompactionEnabled(path: string): boolean | undefined {
-  if (!existsSync(path)) return undefined;
+  invalidate(): void {}
 
-  try {
-    const settings = JSON.parse(readFileSync(path, "utf8")) as Settings;
-    return settings.compaction?.enabled;
-  } catch {
-    return undefined;
+  private buildAll(): Record<ElementKey, string> {
+    const stats = collectTokenStats(this.ctx);
+    const state = this.ctx;
+    const theme = this.theme;
+
+    const cwd = state.sessionManager.getCwd();
+    const pwd = formatCwdForFooter(cwd, process.env.HOME || process.env.USERPROFILE);
+
+    const branch = this.footerData.getGitBranch();
+    const sessionName = state.sessionManager.getSessionName();
+
+    const contextUsage = state.getContextUsage();
+    const contextWindow = contextUsage?.contextWindow ?? state.model?.contextWindow ?? 0;
+    const contextPercentValue = contextUsage?.percent ?? 0;
+    const contextPercentText = contextUsage?.percent != null ? contextPercentValue.toFixed(1) : "?";
+    const autoIndicator = this.autoCompactEnabled ? " (auto)" : "";
+    const contextDisplay =
+      contextPercentText === "?"
+        ? `?/${formatTokens(contextWindow)}${autoIndicator}`
+        : `${contextPercentText}%/${formatTokens(contextWindow)}${autoIndicator}`;
+    let contextStr: string;
+    if (contextPercentValue > 90) contextStr = theme.fg("error", contextDisplay);
+    else if (contextPercentValue > 70) contextStr = theme.fg("warning", contextDisplay);
+    else contextStr = dim(theme, contextDisplay);
+
+    const usingSubscription = state.model ? state.modelRegistry.isUsingOAuth(state.model) : false;
+    const costStr =
+      stats.cost || usingSubscription ? `$${stats.cost.toFixed(3)}${usingSubscription ? " (sub)" : ""}` : "";
+
+    const providerCount = this.footerData.getAvailableProviderCount();
+    const providerStr = state.model && providerCount > 1 ? `(${state.model.provider})` : "";
+    const modelStr = state.model?.id ?? "no-model";
+    let thinkingLevelText = "";
+    if (state.model?.reasoning) {
+      const level = this.getThinkingLevel() || "off";
+      thinkingLevelText = level === "off" ? "• thinking off" : `• ${level}`;
+    }
+
+    const extensionStatuses = this.footerData.getExtensionStatuses();
+    let statusText = "";
+    if (extensionStatuses.size > 0) {
+      statusText = Array.from(extensionStatuses.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([, text]) => sanitizeStatusText(text))
+        .join(" ");
+    }
+
+    return {
+      pwd: dim(theme, pwd),
+      branch: branch ? dim(theme, `(${branch})`) : "",
+      sessionName: sessionName ? dim(theme, `• ${sessionName}`) : "",
+      inputTokens: stats.input ? dim(theme, `↑${formatTokens(stats.input)}`) : "",
+      outputTokens: stats.output ? dim(theme, `↓${formatTokens(stats.output)}`) : "",
+      cacheReadTokens: stats.cacheRead ? dim(theme, `R${formatTokens(stats.cacheRead)}`) : "",
+      cacheWriteTokens: stats.cacheWrite ? dim(theme, `W${formatTokens(stats.cacheWrite)}`) : "",
+      cacheHitRate:
+        (stats.cacheRead > 0 || stats.cacheWrite > 0) && stats.latestCacheHitRate !== undefined
+          ? dim(theme, `CH${stats.latestCacheHitRate.toFixed(1)}%`)
+          : "",
+      cost: costStr ? dim(theme, costStr) : "",
+      context: contextStr,
+      provider: providerStr ? dim(theme, providerStr) : "",
+      model: modelStr ? dim(theme, modelStr) : "",
+      thinkingLevel: thinkingLevelText ? dim(theme, thinkingLevelText) : "",
+      extensionStatuses: statusText,
+    };
+  }
+
+  render(width: number): string[] {
+    const built = this.buildAll();
+    const separator = this.settings.separator ?? " ";
+    const lineConfigs = this.settings.lines ?? [];
+
+    const lines: string[] = [];
+    for (const line of lineConfigs) {
+      const leftParts = (line.left ?? []).map((key) => built[key]).filter((text) => text.length > 0);
+      const rightParts = (line.right ?? []).map((key) => built[key]).filter((text) => text.length > 0);
+      const left = leftParts.join(separator);
+      const right = rightParts.join(separator);
+      if (!left && !right) continue;
+      lines.push(this.composeLine(left, right, width));
+    }
+    return lines;
+  }
+
+  private composeLine(left: string, right: string, width: number): string {
+    const leftWidth = visibleWidth(left);
+    const rightWidth = visibleWidth(right);
+    if (!right) {
+      return truncateToWidth(left, width, dim(this.theme, "..."));
+    }
+    if (!left) {
+      if (rightWidth >= width) return truncateToWidth(right, width, "");
+      return " ".repeat(width - rightWidth) + right;
+    }
+    const minPadding = 2;
+    if (leftWidth + minPadding + rightWidth <= width) {
+      return left + " ".repeat(width - leftWidth - rightWidth) + right;
+    }
+    const availableForRight = width - leftWidth - minPadding;
+    if (availableForRight > 0) {
+      const truncatedRight = truncateToWidth(right, availableForRight, "");
+      const truncatedRightWidth = visibleWidth(truncatedRight);
+      return left + " ".repeat(Math.max(0, width - leftWidth - truncatedRightWidth)) + truncatedRight;
+    }
+    return truncateToWidth(left, width, dim(this.theme, "..."));
   }
 }
 
-function alignFooter(left: string, right: string, width: number): string {
-  if (width <= 0) return "";
-  if (!right) return truncateToWidth(left, width, "…");
+export default function (pi: ExtensionAPI) {
+  pi.on("session_start", (_event, ctx) => {
+    if (ctx.mode !== "tui") return;
 
-  const minimumGap = 2;
-  const rightWidth = visibleWidth(right);
-  if (rightWidth + minimumGap >= width) return truncateToWidth(right, width, "");
+    const settings = loadSettings(ctx.cwd);
+    ctx.ui.setFooter((_tui: TUI, theme: Theme, footerData: ReadonlyFooterDataProvider) => {
+      return new ConfigurableFooter({
+        ctx,
+        footerData,
+        theme,
+        settings,
+        getThinkingLevel: () => pi.getThinkingLevel(),
+      });
+    });
+  });
 
-  const maxLeftWidth = width - rightWidth - minimumGap;
-  const fittedLeft = truncateToWidth(left, maxLeftWidth, "…");
-  const padding = " ".repeat(Math.max(minimumGap, width - visibleWidth(fittedLeft) - rightWidth));
-
-  return truncateToWidth(`${fittedLeft}${padding}${right}`, width, "");
-}
-
-function sanitize(text: string): string {
-  return text
-    .replace(/[\r\n\t]/g, " ")
-    .replace(/ +/g, " ")
-    .trim();
+  pi.on("session_shutdown", (_event, ctx) => {
+    if (ctx.mode !== "tui") return;
+    ctx.ui.setFooter(undefined);
+  });
 }
