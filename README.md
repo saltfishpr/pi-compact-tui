@@ -1,6 +1,6 @@
 # pi-compact-tui
 
-[Pi](https://pi.dev/) extension bundle that replaces the default editor and footer with compact, distraction-free alternatives.
+[Pi](https://pi.dev/) extension bundle with compact TUI components and focused workflow utilities.
 
 ## Install
 
@@ -83,6 +83,24 @@ Default layout:
 Registers the `/clear` slash command as a shortcut for starting a fresh session.
 
 - `/clear` — alias for `/new`: starts a new session immediately, equivalent to `ctx.newSession()`.
+
+### Git Trust
+
+Automatically trusts a project when its `origin` Git remote matches an allowlisted domain or username. If no rule matches, Pi continues with its normal project trust flow.
+
+Configuration is loaded from `~/.pi/agent/extensions/trust.json` (or the equivalent path under a custom Pi agent directory):
+
+```json
+{
+  "domains": ["github.com", "git.example.com"],
+  "usernames": ["saltfishpr", "my-team"]
+}
+```
+
+- Domain and username matching is case-insensitive.
+- Either allowlist can grant trust.
+- HTTPS, SSH URL, and SCP-like remote forms are supported.
+- Only the `origin` remote is checked.
 
 ### Commit Prompt
 

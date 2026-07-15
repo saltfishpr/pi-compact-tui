@@ -1,6 +1,6 @@
 # pi-compact-tui
 
-[Pi](https://pi.dev/) 扩展包，用紧凑、无干扰的替代方案替换默认的编辑器和页脚。
+[Pi](https://pi.dev/) 扩展包，提供紧凑的 TUI 组件和专注的工作流工具。
 
 ## Install
 
@@ -83,6 +83,24 @@ Schema：
 注册 `/clear` 斜杠命令，作为开启新会话的快捷方式。
 
 - `/clear` — `/new` 的别名：立即启动一个新会话，等同于 `ctx.newSession()`。
+
+### Git Trust
+
+当项目的 `origin` Git 远程地址匹配允许的域名或用户名时，自动信任该项目。没有规则匹配时，Pi 会继续执行正常的项目信任流程。
+
+配置从 `~/.pi/agent/extensions/trust.json` 加载（自定义 Pi agent 目录时使用对应路径）：
+
+```json
+{
+  "domains": ["github.com", "git.example.com"],
+  "usernames": ["saltfishpr", "my-team"]
+}
+```
+
+- 域名和用户名匹配不区分大小写。
+- 任一允许列表匹配即可授予信任。
+- 支持 HTTPS、SSH URL 和 SCP 风格的远程地址。
+- 仅检查 `origin` 远程地址。
 
 ### Commit Prompt
 
