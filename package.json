@@ -19,7 +19,8 @@
     "extensions": [
       "./packages/pi-compact-editor/index.ts",
       "./packages/pi-compact-footer/index.ts",
-      "./packages/pi-clear-command/index.ts"
+      "./packages/pi-clear-command/index.ts",
+      "./packages/pi-provider-ark/index.ts"
     ],
     "prompts": [
       "./prompts"
