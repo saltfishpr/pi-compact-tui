@@ -49,15 +49,15 @@ export type FooterConfig = z.infer<typeof footerConfigSchema>;
 /**
  * 加载 pi-compact-footer 的配置，项目级优先。
  *
+ * - 全局级路径：`~/.pi/agent/extensions/footer.json`
  * - 项目级路径：`{cwd}/.pi/extensions/footer.json`
- * - 全局级路径：`~/.pi/extensions/footer.json`
  *
  * @param cwd 项目工作目录。
  * @returns   合并并校验后的 {@link FooterConfig}。
  */
 export function loadConfig(cwd: string): FooterConfig {
-  const globalPath = join(getAgentDir(), CONFIG_FILE_NAME);
-  const projectPath = join(cwd, CONFIG_DIR_NAME, CONFIG_FILE_NAME);
+  const globalPath = join(getAgentDir(), "extensions", CONFIG_FILE_NAME);
+  const projectPath = join(cwd, CONFIG_DIR_NAME, "extensions", CONFIG_FILE_NAME);
 
   const merged = mergeConfig(readConfigFile(projectPath), readConfigFile(globalPath));
 
