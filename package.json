@@ -22,9 +22,6 @@
       "./packages/pi-clear-command/index.ts",
       "./packages/pi-provider-ark/index.ts",
       "./packages/pi-trust-git/index.ts"
-    ],
-    "prompts": [
-      "./prompts"
     ]
   },
   "scripts": {
