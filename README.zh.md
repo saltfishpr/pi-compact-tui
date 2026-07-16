@@ -85,8 +85,8 @@ Schema：
 
 当使用 `openai-codex` 模型时，在页脚状态栏中显示 OpenAI Codex 限流用量。插件使用 Pi 现有的 OAuth 凭据调用 Codex Usage API。
 
-- **限流窗口** — 以已用百分比显示各个窗口，例如 `Codex 5h 23% 7d 41%`。
-- **用量颜色** — 用量超过 70% 时显示警告色，超过 90% 时显示错误色。
+- **限流窗口** — 以剩余百分比显示各个窗口，例如 `5h 77% left 7d 59% left`。
+- **用量颜色** — 剩余用量低于 30% 时显示警告色，低于 10% 时显示错误色。
 - **刷新生命周期** — 在 `session_start`、`model_select` 和 `agent_settled` 时刷新，确保重试、上下文压缩和排队的 follow-up 完成后再获取用量。
 - **认证** — 需要已通过 Pi 登录 `openai-codex` provider；存在 `ChatGPT-Account-ID` 时会一并转发。
 - **清理** — 切换到非 Codex 模型或会话关闭时清除状态。

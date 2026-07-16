@@ -40,14 +40,15 @@ function formatUsage(theme: Theme, usage: CodexUsageResponse): string {
   }
 
   const values = windows.map((window) => {
-    const percent = parsePercent(window.used_percent);
-    const text = `${formatWindow(window.limit_window_seconds)} ${percent === undefined ? "?" : percent.toFixed(0)}%`;
-    if (percent !== undefined && percent > 90) return theme.fg("error", text);
-    if (percent !== undefined && percent > 70) return theme.fg("warning", text);
+    const usedPercent = parsePercent(window.used_percent);
+    const remainingPercent = usedPercent === undefined ? "?" : (100 - usedPercent).toFixed(0);
+    const text = `${formatWindow(window.limit_window_seconds)} ${remainingPercent}% left`;
+    if (usedPercent !== undefined && usedPercent > 90) return theme.fg("error", text);
+    if (usedPercent !== undefined && usedPercent > 70) return theme.fg("warning", text);
     return theme.fg("success", text);
   });
 
-  return values.join(" ");
+  return values.join(" • ");
 }
 
 function buildHeaders(ctx: ExtensionContext, apiKey: string): Record<string, string> {
