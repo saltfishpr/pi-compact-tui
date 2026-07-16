@@ -31,13 +31,12 @@ function parsePercent(value: number | string | undefined): number | undefined {
 }
 
 function formatUsage(theme: Theme, usage: CodexUsageResponse): string {
-  const label = theme.fg("dim", "Codex ");
   const windows = [usage.rate_limit?.primary_window, usage.rate_limit?.secondary_window].filter(
     (window): window is CodexRateWindow => window != null,
   );
 
   if (usage.credits?.unlimited === true || windows.every((window) => parsePercent(window.used_percent) === undefined)) {
-    return label + theme.fg("success", "unlimited");
+    return theme.fg("success", "unlimited");
   }
 
   const values = windows.map((window) => {
@@ -48,7 +47,7 @@ function formatUsage(theme: Theme, usage: CodexUsageResponse): string {
     return theme.fg("success", text);
   });
 
-  return label + values.join(" ");
+  return values.join(" ");
 }
 
 function buildHeaders(ctx: ExtensionContext, apiKey: string): Record<string, string> {
