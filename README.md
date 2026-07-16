@@ -41,7 +41,8 @@ Replaces the default footer with a configurable multi-line status bar. Each line
 | `provider`          | Active provider, shown only when more than one is available.                                                            |
 | `model`             | Active model id.                                                                                                        |
 | `thinkingLevel`     | Reasoning level for models that support it (`• off` / `• <level>`).                                                     |
-| `extensionStatuses` | Aggregated status text emitted by other extensions.                                                                     |
+| `extensionStatuses` | Aggregated status text emitted by other extensions, excluding explicitly positioned keys.                               |
+| `status:<key>`       | Status text for one extension key, placed at this exact position; for example `status:codex-stats`.                      |
 
 #### Configuration
 
@@ -58,11 +59,16 @@ Schema:
   "separator": " ",
   // ordered list of footer lines; each has independent left/right groups
   "lines": [
-    { "left": ["pwd", "branch", "sessionName"], "right": ["cacheHitRate", "cost", "context"] },
+    {
+      "left": ["pwd", "branch", "sessionName"],
+      "right": ["status:codex-stats", "cacheHitRate", "cost", "context"],
+    },
     { "left": ["extensionStatuses"] },
   ],
 }
 ```
+
+Use `status:<key>` anywhere in `left` or `right` to position one status value. Once a key is explicitly positioned, it is excluded from `extensionStatuses`, even when the positioned value is currently empty.
 
 Arrays replace defaults entirely (no deep merge). Lines with no visible content are skipped, so you can safely list optional elements.
 

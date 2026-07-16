@@ -7,7 +7,7 @@ import {
 import type { Component, TUI } from "@earendil-works/pi-tui";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { isAbsolute, relative, resolve, sep } from "node:path";
-import { loadConfig, type ElementKey, type FooterConfig } from "./config";
+import { type BuiltInElementKey, type ElementKey, type FooterConfig, getStatusKey, loadConfig } from "./config";
 
 function sanitizeStatusText(text: string): string {
   return text
@@ -78,6 +78,7 @@ class ConfigurableFooter implements Component {
   private config: FooterConfig;
   private autoCompactEnabled = true;
   private getThinkingLevel: () => string;
+  private positionedStatusKeys: Set<string>;
 
   constructor(opts: {
     ctx: ExtensionContext;
@@ -91,6 +92,14 @@ class ConfigurableFooter implements Component {
     this.theme = opts.theme;
     this.config = opts.config;
     this.getThinkingLevel = opts.getThinkingLevel;
+    this.positionedStatusKeys = new Set(
+      this.config.lines
+        .flatMap((line) => [...(line.left ?? []), ...(line.right ?? [])])
+        .flatMap((element) => {
+          const key = getStatusKey(element);
+          return key === undefined ? [] : [key];
+        }),
+    );
   }
 
   setAutoCompactEnabled(enabled: boolean): void {
@@ -99,7 +108,7 @@ class ConfigurableFooter implements Component {
 
   invalidate(): void {}
 
-  private buildAll(): Record<ElementKey, string> {
+  private buildAll(extensionStatuses: ReadonlyMap<string, string>): Record<BuiltInElementKey, string> {
     const stats = collectTokenStats(this.ctx);
     const state = this.ctx;
     const theme = this.theme;
@@ -137,10 +146,10 @@ class ConfigurableFooter implements Component {
       thinkingLevelText = level === "off" ? "• thinking off" : `• ${level}`;
     }
 
-    const extensionStatuses = this.footerData.getExtensionStatuses();
     let statusText = "";
     if (extensionStatuses.size > 0) {
       statusText = Array.from(extensionStatuses.entries())
+        .filter(([key]) => !this.positionedStatusKeys.has(key))
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([, text]) => sanitizeStatusText(text))
         .join(" ");
@@ -168,14 +177,20 @@ class ConfigurableFooter implements Component {
   }
 
   render(width: number): string[] {
-    const built = this.buildAll();
+    const extensionStatuses = this.footerData.getExtensionStatuses();
+    const built = this.buildAll(extensionStatuses);
     const separator = this.config.separator;
     const lineConfigs = this.config.lines;
+    const resolveElement = (element: ElementKey): string => {
+      const statusKey = getStatusKey(element);
+      if (statusKey !== undefined) return sanitizeStatusText(extensionStatuses.get(statusKey) ?? "");
+      return built[element as BuiltInElementKey];
+    };
 
     const lines: string[] = [];
     for (const line of lineConfigs) {
-      const leftParts = (line.left ?? []).map((key) => built[key]).filter((text) => text.length > 0);
-      const rightParts = (line.right ?? []).map((key) => built[key]).filter((text) => text.length > 0);
+      const leftParts = (line.left ?? []).map(resolveElement).filter((text) => text.length > 0);
+      const rightParts = (line.right ?? []).map(resolveElement).filter((text) => text.length > 0);
       const left = leftParts.join(separator);
       const right = rightParts.join(separator);
       if (!left && !right) continue;

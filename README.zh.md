@@ -41,7 +41,8 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 | `provider`          | 当前 provider，仅当可用 provider 多于一个时显示。                                                         |
 | `model`             | 当前模型 id。                                                                                             |
 | `thinkingLevel`     | 支持推理的模型的推理级别（`• off` / `• <level>`）。                                                       |
-| `extensionStatuses` | 其他扩展上报的聚合状态文本。                                                                              |
+| `extensionStatuses` | 其他扩展上报的聚合状态文本，不包含已明确指定位置的 key。                                                   |
+| `status:<key>`       | 指定扩展 key 的状态文本，显示在当前配置位置；例如 `status:codex-stats`。                                    |
 
 #### 配置
 
@@ -58,11 +59,16 @@ Schema：
   "separator": " ",
   // 有序页脚行列表；每行独立配置左右两组
   "lines": [
-    { "left": ["pwd", "branch", "sessionName"], "right": ["cacheHitRate", "cost", "context"] },
+    {
+      "left": ["pwd", "branch", "sessionName"],
+      "right": ["status:codex-stats", "cacheHitRate", "cost", "context"],
+    },
     { "left": ["extensionStatuses"] },
   ],
 }
 ```
+
+在 `left` 或 `right` 中使用 `status:<key>`，即可将对应 status 值放到指定位置。只要明确指定了某个 key，即使该位置当前没有值，它也不会再出现在 `extensionStatuses` 中。
 
 数组语义为整体覆盖（不做深度合并）。没有任何可见内容的行会被跳过，因此可以放心列出可选元素。
 

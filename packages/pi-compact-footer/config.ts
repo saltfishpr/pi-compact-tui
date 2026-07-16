@@ -5,6 +5,8 @@ import * as z from "zod";
 
 const CONFIG_FILE_NAME = "footer.json";
 
+const STATUS_ELEMENT_PREFIX = "status:";
+
 const ELEMENT_KEYS = [
   "pwd",
   "branch",
@@ -22,9 +24,22 @@ const ELEMENT_KEYS = [
   "extensionStatuses",
 ] as const;
 
-export const elementKeySchema = z.enum(ELEMENT_KEYS);
+export type BuiltInElementKey = (typeof ELEMENT_KEYS)[number];
+export type StatusElementKey = `${typeof STATUS_ELEMENT_PREFIX}${string}`;
+
+const statusElementKeySchema = z.custom<StatusElementKey>(
+  (value) =>
+    typeof value === "string" && value.startsWith(STATUS_ELEMENT_PREFIX) && value.length > STATUS_ELEMENT_PREFIX.length,
+  { message: "Status element must use the format status:<key>" },
+);
+
+export const elementKeySchema = z.union([z.enum(ELEMENT_KEYS), statusElementKeySchema]);
 
 export type ElementKey = z.infer<typeof elementKeySchema>;
+
+export function getStatusKey(element: ElementKey): string | undefined {
+  return element.startsWith(STATUS_ELEMENT_PREFIX) ? element.slice(STATUS_ELEMENT_PREFIX.length) : undefined;
+}
 
 export const lineConfigSchema = z.object({
   left: z.array(elementKeySchema).optional(),
