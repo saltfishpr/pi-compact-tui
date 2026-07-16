@@ -28,7 +28,7 @@ Replaces the default footer with a configurable multi-line status bar. Each line
 
 | Key                 | Description                                                                                                             |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `pwd`               | Current working directory (with `~` for home).                                                                          |
+| `pwd`               | Compact working directory (`~/repos/github.com/user/project` becomes `~/r/g/u/project`).                                 |
 | `branch`            | Git branch, wrapped in parentheses.                                                                                     |
 | `sessionName`       | Current session name, prefixed with `•`.                                                                                |
 | `inputTokens`       | Cumulative input tokens (`↑`).                                                                                          |

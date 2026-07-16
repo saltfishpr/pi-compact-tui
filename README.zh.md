@@ -28,7 +28,7 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 
 | Key                 | 说明                                                                                                      |
 | ------------------- | --------------------------------------------------------------------------------------------------------- |
-| `pwd`               | 当前工作目录（home 显示为 `~`）。                                                                         |
+| `pwd`               | 精简的当前工作目录（`~/repos/github.com/user/project` 显示为 `~/r/g/u/project`）。                         |
 | `branch`            | Git 分支，以括号包裹。                                                                                    |
 | `sessionName`       | 当前会话名，前缀为 `•`。                                                                                  |
 | `inputTokens`       | 累计输入 token（`↑`）。                                                                                   |
