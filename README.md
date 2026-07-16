@@ -78,6 +78,16 @@ Default layout:
 }
 ```
 
+### Codex Stats
+
+Shows OpenAI Codex rate-limit usage in the footer status while an `openai-codex` model is active. It calls the Codex usage API with Pi's existing OAuth credentials.
+
+- **Rate-limit windows** — displays each window as used percentage, for example `Codex 5h 23% 7d 41%`.
+- **Usage colors** — changes from success to warning above 70%, then error above 90%.
+- **Refresh lifecycle** — refreshes on `session_start`, `model_select`, and `agent_settled`, so retries, compaction, and queued follow-ups finish before usage is fetched again.
+- **Authentication** — requires an existing Pi login for the `openai-codex` provider and forwards its `ChatGPT-Account-ID` when available.
+- **Cleanup** — clears the status when switching away from Codex or shutting down the session.
+
 ### Clear Command
 
 Registers the `/clear` slash command as a shortcut for starting a fresh session.

@@ -19,6 +19,7 @@
     "extensions": [
       "./packages/pi-compact-editor/index.ts",
       "./packages/pi-compact-footer/index.ts",
+      "./packages/pi-codex-stats/index.ts",
       "./packages/pi-clear-command/index.ts",
       "./packages/pi-provider-ark/index.ts",
       "./packages/pi-trust-git/index.ts"
@@ -36,9 +37,9 @@
     "@earendil-works/pi-tui": "*"
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "^0.80.2",
-    "@earendil-works/pi-coding-agent": "^0.80.2",
-    "@earendil-works/pi-tui": "^0.80.2",
+    "@earendil-works/pi-ai": "^0.80.7",
+    "@earendil-works/pi-coding-agent": "^0.80.7",
+    "@earendil-works/pi-tui": "^0.80.7",
     "@types/node": "^26.0.1",
     "typescript": "^6.0.3"
   }
