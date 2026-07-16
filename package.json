@@ -21,6 +21,7 @@
       "./packages/pi-codex-stats/index.ts",
       "./packages/pi-compact-editor/index.ts",
       "./packages/pi-compact-footer/index.ts",
+      "./packages/pi-deepseek-stats/index.ts",
       "./packages/pi-provider-ark/index.ts",
       "./packages/pi-trust-git/index.ts"
     ]

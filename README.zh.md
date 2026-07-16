@@ -91,6 +91,26 @@ Schema：
 - **认证** — 需要已通过 Pi 登录 `openai-codex` provider；存在 `ChatGPT-Account-ID` 时会一并转发。
 - **清理** — 切换到非 Codex 模型或会话关闭时清除状态。
 
+### DeepSeek Stats
+
+当使用 `deepseek` provider 时，通过 DeepSeek Balance API 在页脚状态栏显示账户用量：`今日 ¥0.12 • 本次 ¥0.03 • 余额 ¥9.85`。
+
+- **今日使用** — 昨日最后一次观测余额与当前余额的差额。
+- **本次会话使用** — 当前 Pi 会话首次获取的余额与当前余额的差额。
+- **余额记录** — 状态持久化到 `~/.pi/agent/extensions/deepseek-stats-state.json`；首次运行时以当前余额为基线。
+- **刷新生命周期** — 在 `session_start`、`model_select` 和 `agent_settled` 时刷新。
+- **认证** — 使用 Pi 为 `deepseek` provider 配置的 API Key（通常为 `DEEPSEEK_API_KEY`）。
+
+显示币种配置位于 `~/.pi/agent/extensions/deepseek-stats.json`，文件不存在时会自动创建：
+
+```json
+{
+  "currency": "CNY"
+}
+```
+
+`currency` 支持 `CNY` 和 `USD`，用于选择 API 返回的对应币种余额，不进行汇率换算。充值造成的负差额按 0 展示。
+
 ### Clear Command
 
 注册 `/clear` 斜杠命令，作为开启新会话的快捷方式。

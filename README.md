@@ -91,6 +91,26 @@ Shows OpenAI Codex rate-limit usage in the footer status while an `openai-codex`
 - **Authentication** — requires an existing Pi login for the `openai-codex` provider and forwards its `ChatGPT-Account-ID` when available.
 - **Cleanup** — clears the status when switching away from Codex or shutting down the session.
 
+### DeepSeek Stats
+
+While the `deepseek` provider is active, calls the DeepSeek Balance API and shows account usage in the footer: `Today ¥0.12 • Session ¥0.03 • Balance ¥9.85`.
+
+- **Today's usage** — difference between the last balance observed yesterday and the current balance.
+- **Session usage** — difference between the first balance fetched in the current Pi session and the current balance.
+- **Balance history** — persists state in `~/.pi/agent/extensions/deepseek-stats-state.json`; the first run uses the current balance as its baseline.
+- **Refresh lifecycle** — refreshes on `session_start`, `model_select`, and `agent_settled`.
+- **Authentication** — uses Pi's API key for the `deepseek` provider (usually `DEEPSEEK_API_KEY`).
+
+Display currency is configured in `~/.pi/agent/extensions/deepseek-stats.json`, which is created automatically when missing:
+
+```json
+{
+  "currency": "CNY"
+}
+```
+
+`currency` accepts `CNY` or `USD` and selects that currency from the API response; no exchange-rate conversion is performed. Negative differences caused by top-ups are displayed as zero usage.
+
 ### Clear Command
 
 Registers the `/clear` slash command as a shortcut for starting a fresh session.
