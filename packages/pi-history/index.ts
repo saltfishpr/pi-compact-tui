@@ -1,9 +1,19 @@
 import { getAgentDir, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import writeFileAtomic from "write-file-atomic";
 
 const MAX_HISTORY = 100;
+
+function claimShortcutHint(file: string): boolean {
+  try {
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, "", { flag: "wx" });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 function parseLines(raw: string): string[] {
   const items: string[] = [];
@@ -54,7 +64,9 @@ function loadHistory(file: string): string[] {
 }
 
 export default function (pi: ExtensionAPI) {
-  const historyFile = join(getAgentDir(), "extensions", "history.jsonl");
+  const extensionDir = join(getAgentDir(), "extensions");
+  const historyFile = join(extensionDir, "history.jsonl");
+  const shortcutHintFile = join(extensionDir, "history-shortcut-hint-shown");
   let history = loadHistory(historyFile);
   let sessionHistory: string[] = [];
   let cursor: number | null = null;
@@ -70,6 +82,11 @@ export default function (pi: ExtensionAPI) {
   function view(): string[] {
     return sessionHistory.length === 0 ? history : [...history, ...sessionHistory];
   }
+
+  pi.on("session_start", (_event, ctx) => {
+    if (ctx.mode !== "tui" || !claimShortcutHint(shortcutHintFile)) return;
+    ctx.ui.notify("历史输入快捷键：Shift+↑ 上一条，Shift+↓ 下一条", "info");
+  });
 
   pi.on("input", (event) => {
     if (event.source !== "interactive") return;
