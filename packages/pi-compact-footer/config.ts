@@ -1,12 +1,11 @@
-import { CONFIG_DIR_NAME, getAgentDir } from "@earendil-works/pi-coding-agent";
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import * as z from "zod";
 
 const CONFIG_FILE_NAME = "footer.json";
 
-const STATUS_ELEMENT_PREFIX = "status:";
-
+// 内置 element key
 const ELEMENT_KEYS = [
   "pwd",
   "branch",
@@ -24,59 +23,56 @@ const ELEMENT_KEYS = [
   "extensionStatuses",
 ] as const;
 
-export type BuiltInElementKey = (typeof ELEMENT_KEYS)[number];
-export type StatusElementKey = `${typeof STATUS_ELEMENT_PREFIX}${string}`;
+const STATUS_ELEMENT_PREFIX = "status:";
 
-const statusElementKeySchema = z.custom<StatusElementKey>(
-  (value) =>
-    typeof value === "string" && value.startsWith(STATUS_ELEMENT_PREFIX) && value.length > STATUS_ELEMENT_PREFIX.length,
-  { message: "Status element must use the format status:<key>" },
-);
-
-export const elementKeySchema = z.union([z.enum(ELEMENT_KEYS), statusElementKeySchema]);
-
-export type ElementKey = z.infer<typeof elementKeySchema>;
-
-export function getStatusKey(element: ElementKey): string | undefined {
+export function getStatusKey(element: string): string | undefined {
   return element.startsWith(STATUS_ELEMENT_PREFIX) ? element.slice(STATUS_ELEMENT_PREFIX.length) : undefined;
 }
 
 export const lineConfigSchema = z.object({
-  left: z.array(elementKeySchema).optional(),
-  right: z.array(elementKeySchema).optional(),
+  left: z.array(z.string()).optional(),
+  right: z.array(z.string()).optional(),
 });
 
 export type LineConfig = z.infer<typeof lineConfigSchema>;
 
 export const footerConfigSchema = z.object({
-  separator: z.string().default(" "),
-  lines: z.array(lineConfigSchema).default([
+  separator: z.string(),
+  lines: z.array(lineConfigSchema),
+});
+
+export type FooterConfig = z.infer<typeof footerConfigSchema>;
+
+const DEFAULT_CONFIG: FooterConfig = {
+  separator: " ",
+  lines: [
     {
       left: ["pwd", "branch", "sessionName"],
       right: ["cacheHitRate", "cost", "context"],
     },
     { left: ["extensionStatuses"] },
-  ]),
-});
-
-export type FooterConfig = z.infer<typeof footerConfigSchema>;
+  ],
+};
 
 /**
- * 加载 pi-compact-footer 的配置，项目级优先。
+ * 从 `~/.pi/agent/extensions/footer.json` 加载 pi-compact-footer 的全局配置。
  *
- * - 全局级路径：`~/.pi/agent/extensions/footer.json`
- * - 项目级路径：`{cwd}/.pi/extensions/footer.json`
- *
- * @param cwd 项目工作目录。
- * @returns   合并并校验后的 {@link FooterConfig}。
+ * @returns 校验后的 {@link FooterConfig}。
  */
-export function loadConfig(cwd: string): FooterConfig {
+export function loadConfig(): FooterConfig {
   const globalPath = join(getAgentDir(), "extensions", CONFIG_FILE_NAME);
-  const projectPath = join(cwd, CONFIG_DIR_NAME, "extensions", CONFIG_FILE_NAME);
+  ensureDefaultGlobalConfig(globalPath);
+  return footerConfigSchema.parse(readConfigFile(globalPath));
+}
 
-  const merged = mergeConfig(readConfigFile(projectPath), readConfigFile(globalPath));
-
-  return footerConfigSchema.parse(merged);
+function ensureDefaultGlobalConfig(path: string): void {
+  if (existsSync(path)) return;
+  try {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, `${JSON.stringify(DEFAULT_CONFIG, null, 2)}\n`, { flag: "wx" });
+  } catch {
+    // Continue with schema defaults when the global config cannot be created.
+  }
 }
 
 function readConfigFile(path: string): Record<string, unknown> {
@@ -86,14 +82,4 @@ function readConfigFile(path: string): Record<string, unknown> {
   } catch {
     return {};
   }
-}
-
-// 数组语义为“整体覆盖”，对象按 key 浅合并，项目级优先。
-function mergeConfig(primary: Record<string, unknown>, fallback: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = { ...fallback };
-  for (const [key, value] of Object.entries(primary)) {
-    if (value === undefined) continue;
-    result[key] = value;
-  }
-  return result;
 }

@@ -46,10 +46,7 @@ Replaces the default footer with a configurable multi-line status bar. Each line
 
 #### Configuration
 
-Config is loaded from `footer.json`, with project settings overriding global ones:
-
-- Project: `{cwd}/.pi/extensions/footer.json`
-- Global: `~/.pi/extensions/footer.json`
+Config is loaded from `~/.pi/agent/extensions/footer.json`. When the file does not exist, the extension creates it automatically with the default layout.
 
 Schema:
 

@@ -46,10 +46,7 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 
 #### 配置
 
-配置从 `footer.json` 加载，项目级覆盖全局：
-
-- 项目级：`{cwd}/.pi/extensions/footer.json`
-- 全局级：`~/.pi/extensions/footer.json`
+配置从全局路径 `~/.pi/agent/extensions/footer.json` 加载。文件不存在时，插件会自动创建并写入默认布局。
 
 Schema：
 

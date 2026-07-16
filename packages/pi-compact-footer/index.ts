@@ -7,7 +7,7 @@ import {
 import type { Component, TUI } from "@earendil-works/pi-tui";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { isAbsolute, relative, resolve, sep } from "node:path";
-import { type BuiltInElementKey, type ElementKey, type FooterConfig, getStatusKey, loadConfig } from "./config";
+import { type FooterConfig, getStatusKey, loadConfig } from "./config";
 
 function sanitizeStatusText(text: string): string {
   return text
@@ -108,7 +108,7 @@ class ConfigurableFooter implements Component {
 
   invalidate(): void {}
 
-  private buildAll(extensionStatuses: ReadonlyMap<string, string>): Record<BuiltInElementKey, string> {
+  private buildAll(extensionStatuses: ReadonlyMap<string, string>): Record<string, string> {
     const stats = collectTokenStats(this.ctx);
     const state = this.ctx;
     const theme = this.theme;
@@ -181,10 +181,11 @@ class ConfigurableFooter implements Component {
     const built = this.buildAll(extensionStatuses);
     const separator = this.config.separator;
     const lineConfigs = this.config.lines;
-    const resolveElement = (element: ElementKey): string => {
+
+    const resolveElement = (element: string): string => {
       const statusKey = getStatusKey(element);
       if (statusKey !== undefined) return sanitizeStatusText(extensionStatuses.get(statusKey) ?? "");
-      return built[element as BuiltInElementKey];
+      return built[element] ?? "";
     };
 
     const lines: string[] = [];
@@ -227,7 +228,7 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_start", (_event, ctx) => {
     if (ctx.mode !== "tui") return;
 
-    const config = loadConfig(ctx.cwd);
+    const config = loadConfig();
     ctx.ui.setFooter((_tui: TUI, theme: Theme, footerData: ReadonlyFooterDataProvider) => {
       return new ConfigurableFooter({
         ctx,
