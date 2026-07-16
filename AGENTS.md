@@ -77,6 +77,7 @@ pnpm typecheck
 ## 参考文档
 
 Pi 类型声明及完整 API 文档位于:
+
 - `@earendil-works/pi-coding-agent` — extensions.md（事件、ExtensionAPI、ExtensionContext）
 - `@earendil-works/pi-tui` — tui.md（组件 API、自定义组件模式）
 - `@earendil-works/pi-ai` — StringEnum 等 AI 工具类型

@@ -62,7 +62,7 @@ function buildHeaders(ctx: ExtensionContext, apiKey: string): Record<string, str
   return headers;
 }
 
-export default function (pi: ExtensionAPI): void {
+export default function (pi: ExtensionAPI) {
   let inflight: AbortController | undefined;
 
   function clear(ctx: ExtensionContext): void {

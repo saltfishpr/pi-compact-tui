@@ -107,7 +107,7 @@ function parseBalance(response: BalanceResponse, currency: Currency): number {
   return balance;
 }
 
-export default function (pi: ExtensionAPI): void {
+export default function (pi: ExtensionAPI) {
   let inflight: AbortController | undefined;
   let sessionOpeningBalance: number | undefined;
 

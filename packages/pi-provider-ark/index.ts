@@ -46,7 +46,7 @@ function arkModel(id: string, options: ArkModelOptions = {}) {
   };
 }
 
-export default function (pi: ExtensionAPI): void {
+export default function (pi: ExtensionAPI) {
   pi.registerProvider("ark-coding-plan", {
     name: "Volcengine Ark Coding Plan",
     baseUrl: BASE_URL,

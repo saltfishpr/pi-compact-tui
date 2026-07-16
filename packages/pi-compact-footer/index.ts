@@ -36,9 +36,9 @@ function formatCwdForFooter(cwd: string, home: string | undefined): string {
   if (relativeToHome === "") return "~";
 
   const segments = relativeToHome.split(sep);
-  const directorySegments = segments.slice(0, -1).map((segment) =>
-    segment.startsWith(".") ? segment.slice(0, 2) : segment.slice(0, 1),
-  );
+  const directorySegments = segments
+    .slice(0, -1)
+    .map((segment) => (segment.startsWith(".") ? segment.slice(0, 2) : segment.slice(0, 1)));
   return ["~", ...directorySegments, segments.at(-1)].join(sep);
 }
 
