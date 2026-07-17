@@ -15,7 +15,7 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 | 紧凑编辑器      | 在输入框边框中显示当前工作状态、模型和推理级别，减少额外界面占用。             |
 | 多行页脚        | 集中显示项目路径、Git 分支、会话、token、费用、上下文和其他扩展状态。          |
 | 用量状态        | 使用 OpenAI Codex 或 DeepSeek 时，在页脚查看限流额度或账户余额。               |
-| 输入历史        | 使用 `Shift+↑` / `Shift+↓` 找回之前提交的输入；记录会跨会话保留。              |
+| 输入历史        | 使用 `shift+↑` / `shift+↓` 找回之前提交的输入；记录会跨会话保留。              |
 | 快速新会话      | 使用 `/clear` 立即开始新会话，效果与 `/new` 相同。                             |
 | Git 自动信任    | 根据 `origin` 远程地址中的域名或用户名，自动信任符合规则的项目。               |
 | Ark Coding Plan | 注册 `ark-coding-plan` provider，可直接在 Pi 中选择火山方舟 Coding Plan 模型。 |

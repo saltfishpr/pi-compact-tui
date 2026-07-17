@@ -15,7 +15,7 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 | Compact editor | Displays the current activity, model, and reasoning level in the input box border, reducing extra UI clutter. |
 | Multi-line footer | Shows the project path, Git branch, session, tokens, cost, context, and other extension statuses in one place. |
 | Usage status | Shows rate limits or account balance in the footer when using OpenAI Codex or DeepSeek. |
-| Input history | Use `Shift+↑` / `Shift+↓` to retrieve previously submitted inputs. History persists across sessions. |
+| Input history | Use `shift+↑` / `shift+↓` to retrieve previously submitted inputs. History persists across sessions. |
 | Quick new session | Use `/clear` to start a new session immediately, just like `/new`. |
 | Automatic Git trust | Automatically trusts projects that match rules based on the domain or username in the `origin` remote URL. |
 | Ark Coding Plan | Registers the `ark-coding-plan` provider, allowing you to select Volcano Ark Coding Plan models directly in Pi. |
