@@ -35,18 +35,18 @@ Replaces the default footer with a configurable multi-line status bar. Each line
 | `outputTokens`      | Cumulative output tokens (`↓`).                                                                                         |
 | `cacheReadTokens`   | Cumulative cache-read tokens (`R`).                                                                                     |
 | `cacheWriteTokens`  | Cumulative cache-write tokens (`W`).                                                                                    |
-| `cacheHitRate`      | Cache hit rate of the latest turn (`CH<pct>%`).                                                                         |
-| `cost`              | Session cost in USD; appends `(sub)` when using an OAuth subscription.                                                  |
+| `cacheHitRate`      | Cache hit rate of the latest assistant turn (`CH<pct>%`).                                                               |
+| `cost`              | Cumulative session cost in USD; appends `(sub)` when using an OAuth subscription.                                       |
 | `context`           | Context window usage `pct%/window` plus `(auto)` when auto-compaction is on. Colors as warning / error above 70% / 90%. |
-| `provider`          | Active provider, shown only when more than one is available.                                                            |
-| `model`             | Active model id.                                                                                                        |
-| `thinkingLevel`     | Reasoning level for models that support it (`• off` / `• <level>`).                                                     |
+| `provider`          | Active provider in parentheses, shown only when more than one is available.                                             |
+| `model`             | Active model id, or `no-model` when no model is selected.                                                               |
+| `thinkingLevel`     | Reasoning level for supported models (`• thinking off` / `• <level>`).                                                  |
 | `extensionStatuses` | Aggregated status text emitted by other extensions, excluding explicitly positioned keys.                               |
 | `status:<key>`       | Status text for one extension key, placed at this exact position; for example `status:codex-stats`.                      |
 
 #### Configuration
 
-Config is loaded from `~/.pi/agent/extensions/footer.json`. When the file does not exist, the extension creates it automatically with the default layout.
+Config is loaded from `<agent-dir>/extensions/footer.json` (normally `~/.pi/agent/extensions/footer.json`). When the file does not exist, the extension creates it automatically with the default layout. The file is read when a TUI session starts, so restart the session after changing it.
 
 Schema:
 
@@ -67,7 +67,7 @@ Schema:
 
 Use `status:<key>` anywhere in `left` or `right` to position one status value. Once a key is explicitly positioned, it is excluded from `extensionStatuses`, even when the positioned value is currently empty.
 
-Arrays replace defaults entirely (no deep merge). Lines with no visible content are skipped, so you can safely list optional elements.
+The config file is used as a complete layout: `separator` and `lines` are required, with no merge against the defaults. Each line may define `left`, `right`, or both. Unknown element names render nothing, and lines with no visible content are skipped, so optional status elements are safe to include.
 
 Default layout:
 

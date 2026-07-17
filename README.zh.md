@@ -35,18 +35,18 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 | `outputTokens`      | 累计输出 token（`↓`）。                                                                                   |
 | `cacheReadTokens`   | 累计缓存读取 token（`R`）。                                                                               |
 | `cacheWriteTokens`  | 累计缓存写入 token（`W`）。                                                                               |
-| `cacheHitRate`      | 最近一次的缓存命中率（`CH<pct>%`）。                                                                      |
-| `cost`              | 会话费用（美元）；使用 OAuth 订阅时追加 `(sub)`。                                                         |
+| `cacheHitRate`      | 最近一次 assistant 回合的缓存命中率（`CH<pct>%`）。                                                       |
+| `cost`              | 会话累计费用（美元）；使用 OAuth 订阅时追加 `(sub)`。                                                     |
 | `context`           | 上下文窗口使用 `pct%/window`，开启自动压缩时追加 `(auto)`。超过 70% / 90% 时会显示为 warning / error 色。 |
-| `provider`          | 当前 provider，仅当可用 provider 多于一个时显示。                                                         |
-| `model`             | 当前模型 id。                                                                                             |
-| `thinkingLevel`     | 支持推理的模型的推理级别（`• off` / `• <level>`）。                                                       |
+| `provider`          | 当前 provider，以括号包裹，仅当可用 provider 多于一个时显示。                                            |
+| `model`             | 当前模型 id；未选择模型时显示 `no-model`。                                                                |
+| `thinkingLevel`     | 支持推理的模型的推理级别（`• thinking off` / `• <level>`）。                                              |
 | `extensionStatuses` | 其他扩展上报的聚合状态文本，不包含已明确指定位置的 key。                                                   |
 | `status:<key>`       | 指定扩展 key 的状态文本，显示在当前配置位置；例如 `status:codex-stats`。                                    |
 
 #### 配置
 
-配置从全局路径 `~/.pi/agent/extensions/footer.json` 加载。文件不存在时，插件会自动创建并写入默认布局。
+配置从 `<agent-dir>/extensions/footer.json`（通常为 `~/.pi/agent/extensions/footer.json`）加载。文件不存在时，扩展会自动创建并写入默认布局。配置在 TUI 会话启动时读取，修改后需要重启会话。
 
 Schema：
 
@@ -67,7 +67,7 @@ Schema：
 
 在 `left` 或 `right` 中使用 `status:<key>`，即可将对应 status 值放到指定位置。只要明确指定了某个 key，即使该位置当前没有值，它也不会再出现在 `extensionStatuses` 中。
 
-数组语义为整体覆盖（不做深度合并）。没有任何可见内容的行会被跳过，因此可以放心列出可选元素。
+配置文件代表完整布局：必须提供 `separator` 和 `lines`，且不会与默认配置合并。每行可配置 `left`、`right` 或同时配置两者。未知元素名不会渲染内容；没有任何可见内容的行会被跳过，因此可以安全地列出可选状态元素。
 
 默认布局：
 
