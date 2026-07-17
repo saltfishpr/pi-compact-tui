@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
+import { readStoredCredential, type ExtensionAPI, type ExtensionContext, type Theme } from "@earendil-works/pi-coding-agent";
 
 const PROVIDER = "openai-codex";
 const STATUS_KEY = "codex-stats";
@@ -51,12 +51,12 @@ function formatUsage(theme: Theme, usage: CodexUsageResponse): string {
   return values.join(" • ");
 }
 
-function buildHeaders(ctx: ExtensionContext, apiKey: string): Record<string, string> {
+function buildHeaders(apiKey: string): Record<string, string> {
   const headers: Record<string, string> = {
     Accept: "application/json",
     Authorization: `Bearer ${apiKey}`,
   };
-  const credential = ctx.modelRegistry.authStorage.get(PROVIDER);
+  const credential = readStoredCredential(PROVIDER);
   const accountId = credential?.type === "oauth" ? credential.accountId : undefined;
   if (typeof accountId === "string") headers["ChatGPT-Account-ID"] = accountId;
   return headers;
@@ -90,7 +90,7 @@ export default function (pi: ExtensionAPI) {
       }
 
       const response = await fetch(USAGE_URL, {
-        headers: buildHeaders(ctx, apiKey),
+        headers: buildHeaders(apiKey),
         signal: AbortSignal.any([controller.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]),
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
