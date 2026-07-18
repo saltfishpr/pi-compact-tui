@@ -4,6 +4,14 @@ A collection of [Pi](https://pi.dev/) extensions for everyday use. It streamline
 
 ## Installation
 
+### npm
+
+```bash
+pi install npm:pi-compact-tui
+```
+
+### Git
+
 ```bash
 pi install git:github.com/saltfishpr/pi-compact-tui
 ```
@@ -75,6 +83,15 @@ Create `trust.json` and configure the allowed Git domains or usernames:
 Matching is case-insensitive, and a match in either list is sufficient. Only the `origin` remote URL is checked. If no rule matches, Pi continues with its default project trust flow.
 
 ## Updating and Uninstalling
+
+### npm
+
+```bash
+pi update npm:pi-compact-tui
+pi remove npm:pi-compact-tui
+```
+
+### Git
 
 ```bash
 pi update --extensions

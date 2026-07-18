@@ -4,6 +4,14 @@
 
 ## 安装
 
+### npm
+
+```bash
+pi install npm:pi-compact-tui
+```
+
+### Git
+
 ```bash
 pi install git:github.com/saltfishpr/pi-compact-tui
 ```
@@ -75,6 +83,15 @@ export ARK_API_KEY="your-api-key"
 匹配不区分大小写，任一列表命中即可；仅检查 `origin` 远程地址。未命中时，Pi 会继续执行默认的项目信任流程。
 
 ## 更新与卸载
+
+### npm
+
+```bash
+pi update npm:pi-compact-tui
+pi remove npm:pi-compact-tui
+```
+
+### Git
 
 ```bash
 pi update --extensions
