@@ -8,6 +8,7 @@ import {
   DefaultResourceLoader,
   getAgentDir,
   ModelRuntime,
+  parseFrontmatter,
   SessionManager,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
@@ -31,84 +32,36 @@ const frontmatterSchema = z.object({
 
 type Frontmatter = z.infer<typeof frontmatterSchema>;
 
+/** Where an agent definition came from, used to gate repo-controlled agents. */
+type AgentSource = "global" | "project";
+
 interface LoadedAgent extends Frontmatter {
   name: string;
+  source: AgentSource;
   /** Markdown body used as the subagent's system prompt. */
   body: string;
 }
 
-// A minimal frontmatter parser: the repo has no YAML dependency and the fields
-// are simple (a string, a string list, a string), so a hand-rolled subset is
-// enough and avoids pulling in a parser.
-function parseFrontmatter(raw: string): { data: unknown; body: string } | undefined {
-  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/.exec(raw);
-  if (!match) return undefined;
-
-  const data: Record<string, unknown> = {};
-  let currentListKey: string | undefined;
-
-  for (const line of match[1].split(/\r?\n/)) {
-    const listItem = /^\s*-\s+(.*)$/.exec(line);
-    if (listItem && currentListKey) {
-      (data[currentListKey] as string[]).push(unquote(listItem[1].trim()));
-      continue;
-    }
-
-    const entry = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line);
-    if (!entry) continue;
-
-    const key = entry[1];
-    const value = entry[2].trim();
-    if (value === "") {
-      // A bare key introduces a following `- item` block list.
-      data[key] = [];
-      currentListKey = key;
-    } else if (value.startsWith("[") && value.endsWith("]")) {
-      data[key] = value
-        .slice(1, -1)
-        .split(",")
-        .map((item) => unquote(item.trim()))
-        .filter(Boolean);
-      currentListKey = undefined;
-    } else {
-      data[key] = unquote(value);
-      currentListKey = undefined;
-    }
-  }
-
-  return { data, body: match[2].trim() };
-}
-
-function unquote(value: string): string {
-  if (value.length >= 2 && (value.startsWith('"') || value.startsWith("'"))) {
-    const quote = value[0];
-    if (value.endsWith(quote)) return value.slice(1, -1);
-  }
-  return value;
-}
-
-function loadAgentsFromDir(dir: string, out: Map<string, LoadedAgent>): void {
+function loadAgentsFromDir(dir: string, source: AgentSource, out: Map<string, LoadedAgent>): void {
   if (!existsSync(dir)) return;
 
   for (const file of readdirSync(dir)) {
     if (!file.endsWith(".md")) continue;
 
-    const parsed = parseFrontmatter(readFileSync(join(dir, file), "utf8"));
-    if (!parsed) continue;
-
-    const result = frontmatterSchema.safeParse(parsed.data);
+    const { frontmatter, body } = parseFrontmatter(readFileSync(join(dir, file), "utf8"));
+    const result = frontmatterSchema.safeParse(frontmatter);
     if (!result.success) continue;
 
     const name = basename(file, ".md");
-    out.set(name, { name, body: parsed.body, ...result.data });
+    out.set(name, { name, source, body, ...result.data });
   }
 }
 
 // Project agents override global ones with the same name, so load global first.
 function discoverAgents(cwd: string): LoadedAgent[] {
   const agents = new Map<string, LoadedAgent>();
-  loadAgentsFromDir(GLOBAL_AGENTS_DIR, agents);
-  loadAgentsFromDir(join(cwd, PROJECT_AGENTS_DIR), agents);
+  loadAgentsFromDir(GLOBAL_AGENTS_DIR, "global", agents);
+  loadAgentsFromDir(join(cwd, PROJECT_AGENTS_DIR), "project", agents);
   return [...agents.values()];
 }
 
@@ -198,6 +151,16 @@ function registerAgentTool(pi: ExtensionAPI, agents: LoadedAgent[]): void {
     async execute(_toolCallId, params, signal, onUpdate, ctx) {
       const agent = agents.find((candidate) => candidate.name === params.subagent_type);
       if (!agent) throw new Error(`Unknown subagent: ${params.subagent_type}`);
+
+      // Project agents are repo-controlled and can inject arbitrary system
+      // prompts and tool allowlists, so confirm before running one.
+      if (agent.source === "project" && ctx.hasUI) {
+        const ok = await ctx.ui.confirm(
+          "Run project-local subagent?",
+          `Subagent "${agent.name}" is defined in ${PROJECT_AGENTS_DIR}. Project agents are repo-controlled; only continue for trusted repositories.`,
+        );
+        if (!ok) throw new Error(`Canceled: project-local subagent "${agent.name}" not approved`);
+      }
 
       onUpdate?.({ content: [{ type: "text", text: `running ${agent.name}…` }], details: {} });
 
