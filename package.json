@@ -24,6 +24,7 @@
       "./packages/pi-deepseek-stats/index.ts",
       "./packages/pi-history/index.ts",
       "./packages/pi-provider-ark/index.ts",
+      "./packages/pi-subagent/index.ts",
       "./packages/pi-trust-git/index.ts"
     ]
   },
