@@ -281,20 +281,20 @@ async function runSubagent(
 
 // Render the tail of the activity list for the collapsed result view. Text
 // items are clipped to 3 lines; tool calls get a one-line preview.
-function renderDisplayItems(items: DisplayItem[], theme: Theme, limit: number): string {
+function renderDisplayItems(items: DisplayItem[], theme: Theme, limit: number): string[] {
   const toShow = items.slice(-limit);
   const skipped = items.length - toShow.length;
-  let text = "";
-  if (skipped > 0) text += theme.fg("muted", `... ${skipped} earlier items\n`);
+  const lines: string[] = [];
+  if (skipped > 0) lines.push(theme.fg("muted", `... ${skipped} earlier items`));
   for (const item of toShow) {
     if (item.type === "text") {
       const preview = item.text.split("\n").slice(0, 3).join("\n");
-      text += `${theme.fg("toolOutput", preview)}\n`;
+      lines.push(theme.fg("toolOutput", preview));
     } else {
-      text += `${theme.fg("muted", "→ ") + formatToolCall(item.name, item.args, theme)}\n`;
+      lines.push(theme.fg("muted", "→ ") + formatToolCall(item.name, item.args, theme));
     }
   }
-  return text.trimEnd();
+  return lines;
 }
 
 function registerAgentTool(pi: ExtensionAPI, agents: LoadedAgent[]): void {
@@ -347,7 +347,7 @@ function registerAgentTool(pi: ExtensionAPI, agents: LoadedAgent[]): void {
 
     renderCall(args, theme) {
       const preview = args.prompt ? (args.prompt.length > 60 ? `${args.prompt.slice(0, 60)}...` : args.prompt) : "...";
-      const text = `${theme.fg("toolTitle", theme.bold("agent "))}${theme.fg("accent", args.name || "...")}\n  ${theme.fg("dim", preview)}`;
+      const text = `${theme.fg("toolTitle", theme.bold("agent "))}${theme.fg("accent", args.name)}\n  ${theme.fg("dim", preview)}`;
       return new Text(text, 0, 0);
     },
 
@@ -358,14 +358,13 @@ function registerAgentTool(pi: ExtensionAPI, agents: LoadedAgent[]): void {
         return new Text(text?.type === "text" ? text.text : "(no output)", 0, 0);
       }
 
-      const icon = details.isError ? theme.fg("error", "✗") : theme.fg("success", "✓");
-      let header = `${icon} ${theme.fg("toolTitle", theme.bold(details.agent))}${theme.fg("muted", ` (${details.source})`)}`;
-      if (details.isError && details.stopReason) header += ` ${theme.fg("error", `[${details.stopReason}]`)}`;
       const usageStr = details.usage ? formatUsageStats(details.usage, details.model) : "";
 
       if (expanded) {
         const container = new Container();
-        container.addChild(new Text(header, 0, 0));
+        if (details.isError && details.stopReason) {
+          container.addChild(new Text(theme.fg("error", `[${details.stopReason}]`), 0, 0));
+        }
         if (details.isError && details.errorMessage) {
           container.addChild(new Text(theme.fg("error", `Error: ${details.errorMessage}`), 0, 0));
         }
@@ -391,19 +390,22 @@ function registerAgentTool(pi: ExtensionAPI, agents: LoadedAgent[]): void {
         return container;
       }
 
-      let text = header;
+      const lines: string[] = [];
+      if (details.isError && details.stopReason) {
+        lines.push(theme.fg("error", `[${details.stopReason}]`));
+      }
       if (details.isError && details.errorMessage) {
-        text += `\n${theme.fg("error", `Error: ${details.errorMessage}`)}`;
+        lines.push(theme.fg("error", `Error: ${details.errorMessage}`));
       } else if (details.displayItems.length === 0) {
-        text += `\n${theme.fg("muted", details.usage ? "(no output)" : "(running...)")}`;
+        lines.push(theme.fg("muted", details.usage ? "(no output)" : "(running...)"));
       } else {
-        text += `\n${renderDisplayItems(details.displayItems, theme, COLLAPSED_ITEM_COUNT)}`;
+        lines.push(...renderDisplayItems(details.displayItems, theme, COLLAPSED_ITEM_COUNT));
         if (details.displayItems.length > COLLAPSED_ITEM_COUNT) {
-          text += `\n${theme.fg("muted", "(Ctrl+O to expand)")}`;
+          lines.push(theme.fg("muted", "(Ctrl+O to expand)"));
         }
       }
-      if (usageStr) text += `\n${theme.fg("dim", usageStr)}`;
-      return new Text(text, 0, 0);
+      if (usageStr) lines.push(theme.fg("dim", usageStr));
+      return new Text(lines.join("\n"), 0, 0);
     },
   });
 }
