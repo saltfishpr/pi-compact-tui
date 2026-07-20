@@ -14,7 +14,7 @@ import {
   SessionManager,
   SettingsManager,
 } from "@earendil-works/pi-coding-agent";
-import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
+import { Box, Container, Markdown, Spacer, Text, truncateToWidth } from "@earendil-works/pi-tui";
 import * as z from "zod";
 
 const BUILTIN_AGENTS_DIR = join(import.meta.dirname, "agents");
@@ -24,9 +24,8 @@ const PROJECT_AGENTS_DIR = join(".pi", "agents");
 // pi's default coding tools, used when an agent omits its own tool allowlist.
 const DEFAULT_TOOLS = ["read", "bash", "edit", "write"];
 
-// Collapsed renderResult shows only the most recent activity; the rest is
-// available via Ctrl+O.
-const COLLAPSED_ITEM_COUNT = 2;
+const COLLAPSED_LINE_COUNT = 3;
+const SUBAGENT_WIDGET_ID = "subagent-runs";
 
 const frontmatterSchema = z.object({
   description: z.string().min(1),
@@ -53,8 +52,17 @@ interface LoadedAgent extends Frontmatter {
   body: string;
 }
 
-/** One assistant activity extracted from the subagent's transcript. */
-type DisplayItem = { type: "text"; text: string } | { type: "toolCall"; name: string; args: Record<string, unknown> };
+type SubagentActivity =
+  | { type: "running" }
+  | { type: "text"; text: string }
+  | { type: "tool"; name: string; args: Record<string, unknown> };
+
+interface RunningSubagent {
+  number: number;
+  agent: string;
+  task: string;
+  activity: SubagentActivity;
+}
 
 /** Aggregated token/cost usage, filled once the subagent finishes. */
 interface UsageStats {
@@ -71,10 +79,10 @@ interface UsageStats {
  * and consumed by renderResult. Doubles as the tool's `details`.
  */
 interface SubagentResult {
+  number: number;
   agent: string;
   source: AgentSource;
   task: string;
-  displayItems: DisplayItem[];
   finalOutput: string;
   stopReason?: string;
   errorMessage?: string;
@@ -137,6 +145,40 @@ function formatToolCall(name: string, args: Record<string, unknown>, theme: Them
   }
 }
 
+function formatActivity(activity: SubagentActivity, theme: Theme): string {
+  switch (activity.type) {
+    case "running":
+      return theme.fg("muted", "Running...");
+    case "text":
+      return theme.fg("muted", "← ") + theme.fg("toolOutput", activity.text.replace(/\s+/g, " ").trim());
+    case "tool":
+      return theme.fg("muted", "→ ") + formatToolCall(activity.name, activity.args, theme);
+  }
+}
+
+function updateSubagentWidget(ctx: ExtensionContext, running: ReadonlyMap<string, RunningSubagent>): void {
+  if (ctx.mode !== "tui") return;
+  if (running.size === 0) {
+    ctx.ui.setWidget(SUBAGENT_WIDGET_ID, undefined);
+    return;
+  }
+
+  const items = [...running.values()].map((item) => ({ ...item }));
+  ctx.ui.setWidget(SUBAGENT_WIDGET_ID, (_tui, theme) => ({
+    render(width: number): string[] {
+      const lines = [theme.fg("accent", theme.bold(`Subagents (${items.length} running)`))];
+      for (const item of items) {
+        const task = item.task.replace(/\s+/g, " ").trim();
+        lines.push(theme.fg("accent", `● #${item.number} `) + theme.bold(item.agent) + theme.fg("dim", ` — ${task}`));
+        lines.push(`  ${formatActivity(item.activity, theme)}`);
+      }
+      lines.push("");
+      return lines.map((line) => truncateToWidth(line, width));
+    },
+    invalidate() {},
+  }));
+}
+
 function loadAgentsFromDir(dir: string, source: AgentSource, out: Map<string, LoadedAgent>): void {
   if (!existsSync(dir)) return;
 
@@ -168,17 +210,18 @@ function getModelRuntime(): Promise<ModelRuntime> {
 }
 
 async function runSubagent(
+  number: number,
   agent: LoadedAgent,
   task: string,
   signal: AbortSignal | undefined,
   ctx: ExtensionContext,
-  onUpdate: (result: SubagentResult) => void,
+  onActivity: (activity: SubagentActivity) => void,
 ): Promise<SubagentResult> {
   const result: SubagentResult = {
+    number,
     agent: agent.name,
     source: agent.source,
     task,
-    displayItems: [],
     finalOutput: "",
     isError: false,
   };
@@ -221,20 +264,21 @@ async function runSubagent(
     settingsManager: SettingsManager.inMemory({ compaction: { enabled: false } }),
   });
 
-  // Accumulate the subagent's activity as it happens so the main TUI can stream
-  // it live. Usage is filled once at the end (from getSessionStats), so it is
-  // intentionally absent from these mid-run updates.
   const unsubscribe = session.subscribe((event) => {
     if (event.type !== "message_end" || event.message.role !== "assistant") return;
+
+    const textParts: string[] = [];
+    let latestActivity: SubagentActivity | undefined;
     for (const part of event.message.content) {
       if (part.type === "text") {
-        result.finalOutput = part.text;
-        result.displayItems.push({ type: "text", text: part.text });
+        textParts.push(part.text);
+        latestActivity = { type: "text", text: part.text };
       } else if (part.type === "toolCall") {
-        result.displayItems.push({ type: "toolCall", name: part.name, args: part.arguments });
+        latestActivity = { type: "tool", name: part.name, args: part.arguments };
       }
     }
-    onUpdate(result);
+    if (textParts.length > 0) result.finalOutput = textParts.join("\n");
+    if (latestActivity) onActivity(latestActivity);
   });
 
   const onAbort = () => {
@@ -279,25 +323,26 @@ async function runSubagent(
   }
 }
 
-// Render the tail of the activity list for the collapsed result view. Text
-// items are clipped to 3 lines; tool calls get a one-line preview.
-function renderDisplayItems(items: DisplayItem[], theme: Theme, limit: number): string[] {
-  const toShow = items.slice(-limit);
-  const skipped = items.length - toShow.length;
-  const lines: string[] = [];
-  if (skipped > 0) lines.push(theme.fg("muted", `... ${skipped} earlier items`));
-  for (const item of toShow) {
-    if (item.type === "text") {
-      const preview = item.text.split("\n").slice(0, 3).join("\n");
-      lines.push(theme.fg("toolOutput", preview));
-    } else {
-      lines.push(theme.fg("muted", "→ ") + formatToolCall(item.name, item.args, theme));
-    }
+function getNextAgentNumber(ctx: ExtensionContext): number {
+  let maxNumber = 0;
+  for (const entry of ctx.sessionManager.getBranch()) {
+    if (entry.type !== "message") continue;
+    const message = entry.message;
+    if (message.role !== "toolResult" || message.toolName !== "agent") continue;
+
+    const details = message.details as Partial<SubagentResult> | undefined;
+    if (typeof details?.number === "number") maxNumber = Math.max(maxNumber, details.number);
   }
-  return lines;
+  return maxNumber + 1;
 }
 
-function registerAgentTool(pi: ExtensionAPI, agents: LoadedAgent[]): void {
+function registerAgentTool(
+  pi: ExtensionAPI,
+  agents: LoadedAgent[],
+  running: Map<string, RunningSubagent>,
+  initialAgentNumber: number,
+): void {
+  let nextAgentNumber = initialAgentNumber;
   const description = [
     "Delegate a focused task to a specialized subagent that runs in an isolated context.",
     "The subagent does not see this conversation, so put everything it needs in `prompt`.",
@@ -316,7 +361,9 @@ function registerAgentTool(pi: ExtensionAPI, agents: LoadedAgent[]): void {
       ),
       prompt: Type.String({ description: "The full task for the subagent, including all needed context" }),
     }),
-    async execute(_toolCallId, params, signal, onUpdate, ctx) {
+    renderShell: "self",
+
+    async execute(toolCallId, params, signal, _onUpdate, ctx) {
       const agent = agents.find((candidate) => candidate.name === params.name);
       if (!agent) throw new Error(`Unknown subagent: ${params.name}`);
 
@@ -330,88 +377,96 @@ function registerAgentTool(pi: ExtensionAPI, agents: LoadedAgent[]): void {
         if (!ok) throw new Error(`Canceled: project-local subagent "${agent.name}" not approved`);
       }
 
-      const emitUpdate = (partial: SubagentResult) => {
-        onUpdate?.({
-          content: [{ type: "text", text: partial.finalOutput || "(running...)" }],
-          details: partial,
-        });
+      const agentNumber = nextAgentNumber++;
+      running.set(toolCallId, {
+        number: agentNumber,
+        agent: agent.name,
+        task: params.prompt,
+        activity: { type: "running" },
+      });
+      updateSubagentWidget(ctx, running);
+
+      const updateActivity = (activity: SubagentActivity) => {
+        const current = running.get(toolCallId);
+        if (!current) return;
+        current.activity = activity;
+        updateSubagentWidget(ctx, running);
       };
 
-      const result = await runSubagent(agent, params.prompt, signal, ctx, emitUpdate);
-      return {
-        content: [{ type: "text", text: result.finalOutput || result.errorMessage || "(no output)" }],
-        details: result,
-        isError: result.isError,
-      };
+      try {
+        const result = await runSubagent(agentNumber, agent, params.prompt, signal, ctx, updateActivity);
+        return {
+          content: [{ type: "text", text: result.finalOutput || result.errorMessage || "(no output)" }],
+          details: result,
+          isError: result.isError,
+        };
+      } finally {
+        running.delete(toolCallId);
+        updateSubagentWidget(ctx, running);
+      }
     },
 
-    renderCall(args, theme) {
-      const preview = args.prompt ? (args.prompt.length > 60 ? `${args.prompt.slice(0, 60)}...` : args.prompt) : "...";
-      const text = `${theme.fg("toolTitle", theme.bold("agent "))}${theme.fg("accent", args.name)}\n  ${theme.fg("dim", preview)}`;
-      return new Text(text, 0, 0);
+    renderCall() {
+      return new Container();
     },
 
-    renderResult(result, { expanded }, theme) {
+    renderResult(result, { expanded, isPartial }, theme, context) {
+      if (isPartial) return new Container();
+
       const details = result.details as SubagentResult | undefined;
-      if (!details) {
-        const text = result.content[0];
-        return new Text(text?.type === "text" ? text.text : "(no output)", 0, 0);
+      const fallbackText = result.content
+        .filter((item): item is Extract<typeof item, { type: "text" }> => item.type === "text")
+        .map((item) => item.text)
+        .join("\n")
+        .trim();
+      const isError = details?.isError ?? context.isError;
+      const output = details?.finalOutput.trim() || (!isError ? fallbackText : "");
+      const errorMessage = details?.errorMessage || (isError ? fallbackText || "Subagent failed" : "");
+      const usageStr = details?.usage ? formatUsageStats(details.usage, details.model) : "";
+
+      const agentName = details?.agent ?? context.args.name;
+      const agentNumber = details?.number ? `#${details.number} ` : "";
+      const content = new Container();
+      content.addChild(
+        new Text(`${theme.fg("toolTitle", theme.bold(`agent ${agentNumber}`))}${theme.fg("accent", agentName)}`, 0, 0),
+      );
+      if (errorMessage) {
+        const reason = details?.stopReason ? `[${details.stopReason}] ` : "";
+        content.addChild(new Text(theme.fg("error", `${reason}Error: ${errorMessage}`), 0, 0));
       }
 
-      const usageStr = details.usage ? formatUsageStats(details.usage, details.model) : "";
-
-      if (expanded) {
-        const container = new Container();
-        if (details.isError && details.stopReason) {
-          container.addChild(new Text(theme.fg("error", `[${details.stopReason}]`), 0, 0));
+      if (output) {
+        if (errorMessage) content.addChild(new Spacer(1));
+        if (expanded) {
+          content.addChild(new Markdown(output, 0, 0, getMarkdownTheme()));
+        } else {
+          const outputLines = output.split("\n");
+          content.addChild(
+            new Text(theme.fg("toolOutput", outputLines.slice(0, COLLAPSED_LINE_COUNT).join("\n")), 0, 0),
+          );
+          if (outputLines.length > COLLAPSED_LINE_COUNT) {
+            content.addChild(new Text(theme.fg("dim", "(Ctrl+O to expand)"), 0, 0));
+          }
         }
-        if (details.isError && details.errorMessage) {
-          container.addChild(new Text(theme.fg("error", `Error: ${details.errorMessage}`), 0, 0));
-        }
-        container.addChild(new Spacer(1));
-        container.addChild(new Text(theme.fg("muted", "─── Task ───"), 0, 0));
-        container.addChild(new Text(theme.fg("dim", details.task), 0, 0));
-        container.addChild(new Spacer(1));
-        container.addChild(new Text(theme.fg("muted", "─── Output ───"), 0, 0));
-        const toolCalls = details.displayItems.filter((item) => item.type === "toolCall");
-        for (const item of toolCalls) {
-          container.addChild(new Text(theme.fg("muted", "→ ") + formatToolCall(item.name, item.args, theme), 0, 0));
-        }
-        if (details.finalOutput) {
-          container.addChild(new Spacer(1));
-          container.addChild(new Markdown(details.finalOutput.trim(), 0, 0, getMarkdownTheme()));
-        } else if (toolCalls.length === 0) {
-          container.addChild(new Text(theme.fg("muted", "(no output)"), 0, 0));
-        }
-        if (usageStr) {
-          container.addChild(new Spacer(1));
-          container.addChild(new Text(theme.fg("dim", usageStr), 0, 0));
-        }
-        return container;
+      } else if (!errorMessage) {
+        content.addChild(new Text(theme.fg("muted", "(no output)"), 0, 0));
       }
 
-      const lines: string[] = [];
-      if (details.isError && details.stopReason) {
-        lines.push(theme.fg("error", `[${details.stopReason}]`));
+      if (usageStr) {
+        content.addChild(new Spacer(1));
+        content.addChild(new Text(theme.fg("dim", usageStr), 0, 0));
       }
-      if (details.isError && details.errorMessage) {
-        lines.push(theme.fg("error", `Error: ${details.errorMessage}`));
-      } else if (details.displayItems.length === 0) {
-        lines.push(theme.fg("muted", details.usage ? "(no output)" : "(running...)"));
-      } else {
-        lines.push(...renderDisplayItems(details.displayItems, theme, COLLAPSED_ITEM_COUNT));
-        if (details.displayItems.length > COLLAPSED_ITEM_COUNT) {
-          lines.push(theme.fg("muted", "(Ctrl+O to expand)"));
-        }
-      }
-      if (usageStr) lines.push(theme.fg("dim", usageStr));
-      return new Text(lines.join("\n"), 0, 0);
+
+      const box = new Box(1, 1, (text) => theme.bg(isError ? "toolErrorBg" : "toolSuccessBg", text));
+      box.addChild(content);
+      return box;
     },
   });
 }
 
 export default function (pi: ExtensionAPI) {
   let registered = false;
+  const running = new Map<string, RunningSubagent>();
 
   pi.on("session_start", async (_event, ctx) => {
     if (registered) return;
@@ -419,7 +474,12 @@ export default function (pi: ExtensionAPI) {
     const agents = discoverAgents(ctx.cwd);
     if (agents.length === 0) return;
 
-    registerAgentTool(pi, agents);
+    registerAgentTool(pi, agents, running, getNextAgentNumber(ctx));
     registered = true;
+  });
+
+  pi.on("session_shutdown", async (_event, ctx) => {
+    running.clear();
+    updateSubagentWidget(ctx, running);
   });
 }
