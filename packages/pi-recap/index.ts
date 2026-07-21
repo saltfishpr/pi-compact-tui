@@ -20,7 +20,10 @@ export default function (pi: ExtensionAPI) {
       // 未信任项目时，不读取 .pi/settings.json
       projectTrusted: ctx.isProjectTrusted(),
     });
-    if (settings.getPackages().some(isStandalonePiRecap)) return;
+    if (settings.getPackages().some(isStandalonePiRecap)) {
+      ctx.ui.notify("pi-recap 已内置于 pi-compact-tui，请卸载 saltfishpr/pi-recap 插件。", "warning");
+      return;
+    }
 
     const config = loadConfig(ctx.cwd);
 
