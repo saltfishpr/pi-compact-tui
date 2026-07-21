@@ -75,11 +75,11 @@ function ensureDefaultGlobalConfig(path: string): void {
   }
 }
 
-function readConfigFile(path: string): Record<string, unknown> {
-  if (!existsSync(path)) return {};
+function readConfigFile(path: string): unknown {
+  if (!existsSync(path)) return DEFAULT_CONFIG;
   try {
-    return JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
+    return JSON.parse(readFileSync(path, "utf8")) as unknown;
   } catch {
-    return {};
+    return DEFAULT_CONFIG;
   }
 }
