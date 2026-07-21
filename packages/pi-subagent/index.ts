@@ -2,6 +2,7 @@ import { Message, StringEnum, Type } from "@earendil-works/pi-ai";
 import { type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import { discoverAgents, type AgentDiagnostic, type LoadedAgent } from "./agents";
+import { loadConfig } from "./config";
 import { renderSubagentCall, renderSubagentResult, updateSubagentWidget } from "./render";
 import { runSubagent, type RunningSubagent, type SubagentResult } from "./runner";
 
@@ -124,6 +125,9 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("session_start", async (_event, ctx) => {
     if (registered) return;
+
+    const config = loadConfig();
+    if (!config.enabled) return;
 
     const catalog = discoverAgents(ctx.cwd, ctx.isProjectTrusted());
     reportDiagnostics(ctx, catalog.diagnostics);
