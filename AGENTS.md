@@ -88,6 +88,15 @@ export default function (pi: ExtensionAPI) {
 pnpm typecheck
 ```
 
+## README 规范
+
+README（`README.md` / `README.zh.md`）面向插件使用者，不是开发者：
+
+- 站在用户视角：介绍能力、如何快速上手、需要哪些配置。
+- 不要堆砌技术细节（内部实现、类型系统、依赖关系、代码结构等属于 AGENTS.md，不进 README）。
+- 每个 extension 只需回答两个问题：**它做什么**、**用户需要配置什么**（配置文件路径、字段、示例）。
+- 安装与启用步骤保持最短路径，避免与官方文档重复。
+
 ## 参考文档
 
 Pi 类型声明及完整 API 文档位于:
