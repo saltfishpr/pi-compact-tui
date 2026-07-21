@@ -55,6 +55,12 @@ function registerAgentTool(
         agents.map((agent) => agent.name),
         { description: "Which subagent to run" },
       ),
+      title: Type.String({
+        description: "A short title shown in the running subagent widget; it is not sent to the subagent",
+        minLength: 1,
+        maxLength: 60,
+        pattern: "^(?=.*\\S)[^\\r\\n]+$",
+      }),
       prompt: Type.String({ description: "The full task for the subagent, including all needed context" }),
     }),
     renderShell: "self",
@@ -67,7 +73,7 @@ function registerAgentTool(
       running.set(toolCallId, {
         number: agentNumber,
         agent: agent.name,
-        task: params.prompt,
+        title: params.title.trim(),
         messages: [],
       });
       updateSubagentWidget(ctx, running);

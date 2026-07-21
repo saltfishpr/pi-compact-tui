@@ -2,6 +2,7 @@ import { homedir } from "node:os";
 
 import { Message } from "@earendil-works/pi-ai";
 import {
+  AgentToolResult,
   getMarkdownTheme,
   keyHint,
   type ExtensionContext,
@@ -15,13 +16,8 @@ import type { RunningSubagent, SubagentResult, UsageStats } from "./runner";
 const COLLAPSED_LINE_COUNT = 3;
 const SUBAGENT_WIDGET_ID = "subagent-runs";
 
-interface RenderableToolResult {
-  content: Array<{ type: string; text?: string }>;
-  details?: unknown;
-}
-
 interface AgentRenderContext {
-  args: { name?: string };
+  args: { name?: string; title?: string };
   isError: boolean;
 }
 
@@ -68,18 +64,18 @@ function formatToolCall(name: string, args: Record<string, unknown>, theme: Them
       const content = (args.content || "") as string;
       const lines = content.split("\n").length;
       let text = theme.fg("accent", "write ") + theme.fg("muted", shortenPath(path));
-      if (lines > 1) text += theme.fg("dim", ` (${lines} lines)`);
+      if (lines > 1) text += theme.fg("muted", ` (${lines} lines)`);
       return text;
     }
     case "grep": {
       const pattern = (args.pattern || "") as string;
       const path = (args.path || ".") as string;
-      return theme.fg("accent", `grep /${pattern}/`) + theme.fg("dim", ` in ${shortenPath(path)}`);
+      return theme.fg("accent", `grep /${pattern}/`) + theme.fg("muted", ` in ${shortenPath(path)}`);
     }
     case "find": {
       const pattern = (args.pattern || "*") as string;
       const path = (args.path || ".") as string;
-      return theme.fg("accent", `find ${pattern}`) + theme.fg("dim", ` in ${shortenPath(path)}`);
+      return theme.fg("accent", `find ${pattern}`) + theme.fg("muted", ` in ${shortenPath(path)}`);
     }
     case "ls": {
       const path = (args.path || ".") as string;
@@ -129,8 +125,9 @@ export function updateSubagentWidget(ctx: ExtensionContext, running: ReadonlyMap
     render(width: number): string[] {
       const lines = [theme.fg("accent", theme.bold(`Subagents (${items.length} running)`))];
       for (const item of items) {
-        const task = item.task.replace(/\s+/g, " ").trim();
-        lines.push(theme.fg("accent", `● #${item.number} `) + theme.bold(item.agent) + theme.fg("dim", ` — ${task}`));
+        lines.push(
+          theme.fg("accent", `● #${item.number} `) + theme.bold(item.agent) + theme.fg("dim", ` — ${item.title}`),
+        );
         const lastItem = getLastDisplayItem(item.messages);
         lines.push(`  ${lastItem ? formatDisplayItem(lastItem, theme) : theme.fg("muted", "Running...")}`);
       }
@@ -146,14 +143,14 @@ export function renderSubagentCall(): Component {
 }
 
 export function renderSubagentResult(
-  result: RenderableToolResult,
+  result: AgentToolResult<SubagentResult>,
   options: ToolRenderResultOptions,
   theme: Theme,
   context: AgentRenderContext,
 ): Component {
   if (options.isPartial) return new Container();
 
-  const details = result.details as SubagentResult | undefined;
+  const details = result.details;
   const fallbackText = result.content
     .filter((item) => item.type === "text")
     .map((item) => item.text ?? "")
@@ -164,12 +161,16 @@ export function renderSubagentResult(
   const errorMessage = details?.errorMessage || (isError ? fallbackText || "Subagent failed" : "");
   const usage = details?.usage ? formatUsageStats(details.usage, details.model) : "";
 
-  const agentName = details?.agent ?? context.args.name ?? "...";
   const agentNumber = details?.number ? `#${details.number} ` : "";
+  const agentName = details?.agent ?? context.args.name ?? "...";
+  const title = context.args.title?.trim();
+  const heading =
+    theme.fg("toolTitle", theme.bold(`agent ${agentNumber}`)) +
+    theme.fg("accent", agentName) +
+    (title ? theme.fg("muted", ` — ${title}`) : "");
+
   const content = new Container();
-  content.addChild(
-    new Text(`${theme.fg("toolTitle", theme.bold(`agent ${agentNumber}`))}${theme.fg("accent", agentName)}`, 0, 0),
-  );
+  content.addChild(new Text(heading, 0, 0));
   if (errorMessage) {
     const reason = details?.stopReason ? `[${details.stopReason}] ` : "";
     content.addChild(new Text(theme.fg("error", `${reason}Error: ${errorMessage}`), 0, 0));

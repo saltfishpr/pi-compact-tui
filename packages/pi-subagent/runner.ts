@@ -24,7 +24,7 @@ import type { AgentSource, LoadedAgent } from "./agents";
 export interface RunningSubagent {
   number: number;
   agent: string;
-  task: string;
+  title: string;
   messages: Message[];
 }
 
