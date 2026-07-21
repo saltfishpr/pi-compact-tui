@@ -18,16 +18,16 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 
 ## What You Get
 
-| Feature | Purpose |
-| --- | --- |
-| Compact editor | Displays the current activity, model, and reasoning level in the input box border, reducing extra UI clutter. |
-| Multi-line footer | Shows the project path, Git branch, session, tokens, cost, context, and other extension statuses in one place. |
-| Usage status | Shows rate limits or account balance in the footer when using OpenAI Codex or DeepSeek. |
-| Input history | Use `shift+↑` / `shift+↓` to retrieve previously submitted inputs. History persists across sessions. |
-| Quick new session | Use `/clear` to start a new session immediately, just like `/new`. |
-| Automatic Git trust | Automatically trusts projects that match rules based on the domain or username in the `origin` remote URL. |
-| Ark Coding Plan | Registers the `ark-coding-plan` provider, allowing you to select Volcano Ark Coding Plan models directly in Pi. |
-| Subagents | Registers an `agent` tool that delegates focused tasks to specialized subagents running in isolated contexts, with live progress in the TUI. |
+| Feature             | Purpose                                                                                                                                      |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Compact editor      | Displays the current activity, model, and reasoning level in the input box border, reducing extra UI clutter.                                |
+| Multi-line footer   | Shows the project path, Git branch, session, tokens, cost, context, and other extension statuses in one place.                               |
+| Usage status        | Shows rate limits or account balance in the footer when using OpenAI Codex or DeepSeek.                                                      |
+| Input history       | Use `shift+↑` / `shift+↓` to retrieve previously submitted inputs. History persists across sessions.                                         |
+| Quick new session   | Use `/clear` to start a new session immediately, just like `/new`.                                                                           |
+| Automatic Git trust | Automatically trusts projects that match rules based on the domain or username in the `origin` remote URL.                                   |
+| Ark Coding Plan     | Registers the `ark-coding-plan` provider, allowing you to select Volcano Ark Coding Plan models directly in Pi.                              |
+| Subagents           | Registers an `agent` tool that delegates focused tasks to specialized subagents running in isolated contexts, with live progress in the TUI. |
 
 ## Optional Configuration
 
@@ -85,46 +85,50 @@ Matching is case-insensitive, and a match in either list is sufficient. Only the
 
 ### Subagents
 
-Subagents are defined as markdown files. They are discovered from three locations, in increasing precedence (a later definition shadows an earlier one with the same name):
+The package includes a read-only `planner` subagent. No setup is required—ask Pi to use it when you need a plan grounded in the current codebase:
 
-- Built-in: shipped with this package
-- Global: `~/.pi/agent/agents/`
-- Project: `.pi/agents/` (repo-controlled; loaded only when Pi trusts the project)
+```text
+Use the planner subagent to inspect this project and create an implementation plan for adding user authentication.
+```
 
-The catalog is fixed when the session starts. Use `/reload` after changing an agent file. Invalid definitions are skipped and reported.
+Pi delegates the task and shows live progress in the TUI while it runs.
 
-Each file uses YAML frontmatter followed by a markdown body that becomes the subagent's system prompt:
+#### Add a Custom Subagent
+
+Create a markdown file in one of these locations:
+
+- `~/.pi/agent/agents/` — available in every project
+- `.pi/agents/` — available only in the current trusted project
+
+The filename becomes the subagent name. For example, create `~/.pi/agent/agents/reviewer.md`:
 
 ```markdown
 ---
-description: Creates concrete implementation plans from context and requirements. Read-only; never edits code.
+description: Reviews code changes for correctness and maintainability without editing files.
 tools:
   - read
-  - grep
-  - find
-  - ls
-model: anthropic/claude-opus-4-5
+  - bash
 effort: high
-skills:
-  - some-skill
-maxTurns: 100
 ---
 
-You are a planning specialist...
+Review the requested changes. Identify concrete bugs, risks, and maintainability issues.
+Reference the relevant files and explain how each issue should be fixed.
 ```
 
-| Field | Required | Description |
-| --- | --- | --- |
-| `description` | Yes | Explains when to use the subagent; shown to the calling agent. |
-| `tools` | No | Built-in tool allowlist. Defaults to all built-in tools: `read`, `bash`, `edit`, `write`, `grep`, `find`, and `ls`. |
-| `model` | No | Model override in `provider/id` form. Defaults to the caller's model. |
-| `effort` | No | Reasoning level: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`. Defaults to the caller's current level. |
-| `skills` | No | Skill names preloaded into the subagent's system prompt. Requires the `read` tool to load them. |
-| `maxTurns` | No | Prevents continuation beyond this many assistant turns; a final answer on the last allowed turn still succeeds. |
+Run `/reload` after creating or editing a subagent. You can then ask Pi to “use the reviewer subagent.”
 
-Explicitly configured models, skills, and tools must be available or the run is rejected. The subagent runs in a fresh context and cannot see the main conversation. Its system prompt contains only the definition body and configured skills, so include all other task context in `prompt`.
+#### Configuration
 
-Tool output is limited to Pi's default 2,000 lines or 50 KB. When truncated, the complete output is written to a temporary file and its path is included in the result.
+| Field         | Required | Purpose                                                                                  |
+| ------------- | -------- | ---------------------------------------------------------------------------------------- |
+| `description` | Yes      | Tells Pi when this subagent is useful.                                                   |
+| `tools`       | No       | Limits the tools it can use. Omit to allow all built-in coding tools.                    |
+| `model`       | No       | Uses a specific model in `provider/id` format. Omit to use the current model.            |
+| `effort`      | No       | Sets reasoning effort: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`.     |
+| `skills`      | No       | Loads selected Pi skills for this subagent. Include `read` in `tools` when using skills. |
+| `maxTurns`    | No       | Limits how many turns the subagent may take.                                             |
+
+The markdown body defines the subagent's role, constraints, and expected output. Project definitions require a trusted project. If names conflict, project definitions override global definitions, which override bundled definitions.
 
 ## Updating and Uninstalling
 
