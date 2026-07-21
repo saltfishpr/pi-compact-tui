@@ -2,7 +2,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import type { Model, ModelThinkingLevel, ThinkingLevel } from "@earendil-works/pi-ai";
+import type { Model, ModelThinkingLevel, ThinkingLevel, Message } from "@earendil-works/pi-ai";
 import {
   createAgentSession,
   createCodingTools,
@@ -21,16 +21,11 @@ import {
 
 import type { AgentSource, LoadedAgent } from "./agents";
 
-export type SubagentActivity =
-  | { type: "running" }
-  | { type: "text"; text: string }
-  | { type: "tool"; name: string; args: Record<string, unknown> };
-
 export interface RunningSubagent {
   number: number;
   agent: string;
   task: string;
-  activity: SubagentActivity;
+  messages: Message[];
 }
 
 export interface UsageStats {
@@ -65,7 +60,7 @@ export interface RunSubagentOptions {
   cwd: string;
   model?: Model<any>;
   thinkingLevel: ModelThinkingLevel;
-  onActivity: (activity: SubagentActivity) => void;
+  onMessage: (message: Message) => void;
 }
 
 function getSupportedToolNames(cwd: string): string[] {
@@ -102,7 +97,7 @@ async function truncateOutput(result: SubagentResult, output: string): Promise<v
 }
 
 export async function runSubagent(options: RunSubagentOptions): Promise<SubagentResult> {
-  const { number, agent, task, signal, cwd, model, thinkingLevel, onActivity } = options;
+  const { number, agent, task, signal, cwd, model, thinkingLevel, onMessage } = options;
   const result: SubagentResult = {
     number,
     agent: agent.name,
@@ -177,18 +172,12 @@ export async function runSubagent(options: RunSubagentOptions): Promise<Subagent
   const unsubscribe = session.subscribe((event) => {
     if (event.type !== "message_end" || event.message.role !== "assistant") return;
 
-    const textParts: string[] = [];
-    let latestActivity: SubagentActivity | undefined;
-    for (const part of event.message.content) {
-      if (part.type === "text") {
-        textParts.push(part.text);
-        latestActivity = { type: "text", text: part.text };
-      } else if (part.type === "toolCall") {
-        latestActivity = { type: "tool", name: part.name, args: part.arguments };
-      }
-    }
+    onMessage(event.message);
+
+    const textParts = event.message.content
+      .filter((part): part is Extract<typeof part, { type: "text" }> => part.type === "text")
+      .map((part) => part.text);
     if (textParts.length > 0) latestOutput = textParts.join("\n");
-    if (latestActivity) onActivity(latestActivity);
 
     turnCount++;
     if (agent.maxTurns && turnCount >= agent.maxTurns && event.message.stopReason === "toolUse") {

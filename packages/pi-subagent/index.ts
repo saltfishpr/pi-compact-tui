@@ -1,4 +1,4 @@
-import { StringEnum, Type } from "@earendil-works/pi-ai";
+import { Message, StringEnum, Type } from "@earendil-works/pi-ai";
 import { type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import { discoverAgents, type AgentDiagnostic, type LoadedAgent } from "./agents";
@@ -68,14 +68,14 @@ function registerAgentTool(
         number: agentNumber,
         agent: agent.name,
         task: params.prompt,
-        activity: { type: "running" },
+        messages: [],
       });
       updateSubagentWidget(ctx, running);
 
-      const onActivity = (activity: RunningSubagent["activity"]) => {
+      const onMessage = (message: Message) => {
         const current = running.get(toolCallId);
         if (!current) return;
-        current.activity = activity;
+        current.messages.push(message);
         updateSubagentWidget(ctx, running);
       };
 
@@ -95,7 +95,7 @@ function registerAgentTool(
           cwd: ctx.cwd,
           model,
           thinkingLevel,
-          onActivity,
+          onMessage,
         });
         return {
           content: [{ type: "text", text: result.finalOutput || result.errorMessage || "(no output)" }],
