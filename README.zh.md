@@ -28,6 +28,7 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 | Git 自动信任    | 根据 `origin` 远程地址中的域名或用户名，自动信任符合规则的项目。                             |
 | Ark Coding Plan | 注册 `ark-coding-plan` provider，可直接在 Pi 中选择火山方舟 Coding Plan 模型。               |
 | 子代理          | 注册 `agent` 工具，将聚焦任务委派给在隔离上下文中运行的专用子代理，并在 TUI 中实时展示进度。 |
+| 空闲回顾        | 会话进入空闲状态时自动生成会话摘要，并通过 TUI widget 展示；亦可通过 `/recap` 手动触发。     |
 
 ## 按需配置
 
@@ -129,6 +130,24 @@ effort: high
 | `maxTurns`    | 否   | 限制子代理最多执行多少轮。                                                  |
 
 Markdown 正文用于描述子代理的职责、约束和预期输出。项目级定义仅在项目受信任时加载。同名时，项目级定义覆盖全局定义，全局定义覆盖插件内置定义。
+
+### 空闲回顾
+
+默认情况下，会话空闲 5 分钟后会使用当前模型自动生成一次 recap。使用 `/recap` 可立即触发。
+
+如需自定义，创建 `.pi/extensions/pi-recap.json`（项目级）或 `~/.pi/agent/extensions/pi-recap.json`（全局）：
+
+```json
+{
+  "model": "openai/gpt-4o-mini",
+  "thinkingLevel": "off",
+  "idle": "3m"
+}
+```
+
+- `model` — 指定生成 recap 的模型，格式为 `provider/model`。不填则使用当前模型。
+- `thinkingLevel` — `off` / `minimal` / `low` / `medium` / `high` / `xhigh`。
+- `idle` — 触发前的空闲时长，如 `"3m"` 或 `180000`，下限 5s。
 
 ## 更新与卸载
 

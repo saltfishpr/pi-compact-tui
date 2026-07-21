@@ -28,6 +28,7 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 | Automatic Git trust | Automatically trusts projects that match rules based on the domain or username in the `origin` remote URL.                                   |
 | Ark Coding Plan     | Registers the `ark-coding-plan` provider, allowing you to select Volcano Ark Coding Plan models directly in Pi.                              |
 | Subagents           | Registers an `agent` tool that delegates focused tasks to specialized subagents running in isolated contexts, with live progress in the TUI. |
+| Idle recap          | Generates a short session recap when the session goes idle and renders it in a TUI widget. Trigger it manually with `/recap`.                |
 
 ## Optional Configuration
 
@@ -129,6 +130,24 @@ Run `/reload` after creating or editing a subagent. You can then ask Pi to “us
 | `maxTurns`    | No       | Limits how many turns the subagent may take.                                             |
 
 The markdown body defines the subagent's role, constraints, and expected output. Project definitions require a trusted project. If names conflict, project definitions override global definitions, which override bundled definitions.
+
+### Idle Recap
+
+By default, a recap is generated after the session has been idle for 5 minutes, using the current model. Use `/recap` to trigger one immediately.
+
+To customize, create `.pi/extensions/pi-recap.json` (project) or `~/.pi/agent/extensions/pi-recap.json` (global):
+
+```json
+{
+  "model": "openai/gpt-4o-mini",
+  "thinkingLevel": "off",
+  "idle": "3m"
+}
+```
+
+- `model` — pick a dedicated model in `provider/model` format. Omit to use the current model.
+- `thinkingLevel` — `off` / `minimal` / `low` / `medium` / `high` / `xhigh`.
+- `idle` — how long to wait before triggering, e.g. `"3m"` or `180000`. Minimum 5s.
 
 ## Updating and Uninstalling
 
