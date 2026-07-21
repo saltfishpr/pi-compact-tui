@@ -27,6 +27,7 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 | 快速新会话      | 使用 `/clear` 立即开始新会话，效果与 `/new` 相同。                             |
 | Git 自动信任    | 根据 `origin` 远程地址中的域名或用户名，自动信任符合规则的项目。               |
 | Ark Coding Plan | 注册 `ark-coding-plan` provider，可直接在 Pi 中选择火山方舟 Coding Plan 模型。 |
+| 子代理          | 注册 `agent` 工具，将聚焦任务委派给在隔离上下文中运行的专用子代理，并在 TUI 中实时展示进度。 |
 
 ## 按需配置
 
@@ -81,6 +82,45 @@ export ARK_API_KEY="your-api-key"
 ```
 
 匹配不区分大小写，任一列表命中即可；仅检查 `origin` 远程地址。未命中时，Pi 会继续执行默认的项目信任流程。
+
+### 子代理
+
+子代理以 markdown 文件定义，从三处发现，优先级由低到高（同名时后者覆盖前者）：
+
+- 内置：随本扩展一起提供
+- 全局：`~/.pi/agent/agents/`
+- 项目：`.pi/agents/`（受仓库控制；每次运行前需确认）
+
+每个文件由 YAML frontmatter 加 markdown 正文组成，正文作为子代理的 system prompt：
+
+```markdown
+---
+description: 根据上下文和需求生成具体的实现方案。只读，绝不修改代码。
+tools:
+  - read
+  - grep
+  - find
+  - ls
+model: anthropic/claude-opus-4-5
+effort: high
+skills:
+  - some-skill
+maxTurns: 100
+---
+
+You are a planning specialist...
+```
+
+| 字段          | 必填 | 说明                                                                     |
+| ------------- | ---- | ------------------------------------------------------------------------ |
+| `description` | 是   | 说明何时使用该子代理，会展示给调用方。                                    |
+| `tools`       | 否   | 工具白名单。默认为 `read`、`bash`、`edit`、`write`。                      |
+| `model`       | 否   | `provider/id` 形式的模型覆盖。默认沿用调用方模型。                        |
+| `effort`      | 否   | 推理级别：`minimal`、`low`、`medium`、`high`、`xhigh`、`max`。默认取 Pi 默认值。 |
+| `skills`      | 否   | 预加载到子代理 system prompt 的 skill 名称。需 `read` 工具才能加载。      |
+| `maxTurns`    | 否   | 限制 assistant 轮数，达到上限后子代理停止。                               |
+
+子代理在全新上下文中运行，看不到主对话，因此需把它所需的一切都写进任务 prompt。
 
 ## 更新与卸载
 

@@ -5,6 +5,7 @@ tools:
   - grep
   - find
   - ls
+effort: high
 ---
 
 You are a planning specialist. You receive context and requirements, then produce a clear, concrete implementation plan.

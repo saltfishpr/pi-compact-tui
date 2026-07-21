@@ -27,14 +27,23 @@ const DEFAULT_TOOLS = ["read", "bash", "edit", "write"];
 const COLLAPSED_LINE_COUNT = 3;
 const SUBAGENT_WIDGET_ID = "subagent-runs";
 
+// pi's reasoning/thinking levels, matching @earendil-works/pi-ai ThinkingLevel.
+const THINKING_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
+
 const frontmatterSchema = z.object({
   description: z.string().min(1),
   tools: z.array(z.string()).optional(),
+  // Skill names to expose to the subagent's system prompt. Omit to give it none.
+  skills: z.array(z.string()).optional(),
   // provider/id, e.g. anthropic/claude-opus-4-5
   model: z
     .string()
     .regex(/^[^/]+\/.+$/)
     .optional(),
+  // Reasoning effort for this subagent. Omit to inherit the caller's level.
+  effort: z.enum(THINKING_LEVELS).optional(),
+  // Hard cap on assistant turns; the subagent is stopped once it is reached.
+  maxTurns: z.number().int().positive().optional(),
 });
 
 type Frontmatter = z.infer<typeof frontmatterSchema>;
@@ -241,16 +250,23 @@ async function runSubagent(
   result.model = `${model.provider}/${model.id}`;
 
   // Isolated session: no extensions (so the subagent can't recurse into this
-  // tool), no skills, no context files, with the markdown body as its prompt.
+  // tool), no context files, with the markdown body as its prompt. Skills stay
+  // loadable but are filtered down to the agent's `skills` allowlist so only
+  // those appear in the subagent's system prompt.
+  const allowedSkills = new Set(agent.skills ?? []);
   const loader = new DefaultResourceLoader({
     cwd: ctx.cwd,
     agentDir: getAgentDir(),
     noExtensions: true,
-    noSkills: true,
+    noSkills: allowedSkills.size === 0,
     noPromptTemplates: true,
     noThemes: true,
     noContextFiles: true,
     systemPromptOverride: () => agent.body,
+    skillsOverride: (base) => ({
+      ...base,
+      skills: base.skills.filter((skill) => allowedSkills.has(skill.name)),
+    }),
   });
   await loader.reload();
 
@@ -258,12 +274,16 @@ async function runSubagent(
     cwd: ctx.cwd,
     modelRuntime: runtime,
     model,
+    thinkingLevel: agent.effort,
     tools: agent.tools ?? DEFAULT_TOOLS,
     resourceLoader: loader,
     sessionManager: SessionManager.inMemory(ctx.cwd),
     settingsManager: SettingsManager.inMemory({ compaction: { enabled: false } }),
   });
 
+  // Counts assistant turns so we can stop a runaway subagent at maxTurns.
+  let turnCount = 0;
+  let hitMaxTurns = false;
   const unsubscribe = session.subscribe((event) => {
     if (event.type !== "message_end" || event.message.role !== "assistant") return;
 
@@ -279,6 +299,12 @@ async function runSubagent(
     }
     if (textParts.length > 0) result.finalOutput = textParts.join("\n");
     if (latestActivity) onActivity(latestActivity);
+
+    turnCount++;
+    if (agent.maxTurns && turnCount >= agent.maxTurns) {
+      hitMaxTurns = true;
+      void session.abort();
+    }
   });
 
   const onAbort = () => {
@@ -302,7 +328,15 @@ async function runSubagent(
     const stopReason = session.state.messages
       .filter((m): m is Extract<typeof m, { role: "assistant" }> => m.role === "assistant")
       .at(-1)?.stopReason;
-    if (signal?.aborted || stopReason === "aborted") {
+    if (hitMaxTurns) {
+      // Stopping at the turn cap is expected, so keep whatever output the
+      // subagent produced and only flag an error when it produced nothing.
+      result.stopReason = "max_turns";
+      if (!result.finalOutput) {
+        result.isError = true;
+        result.errorMessage = `Subagent "${agent.name}" hit the ${agent.maxTurns}-turn limit with no output`;
+      }
+    } else if (signal?.aborted || stopReason === "aborted") {
       result.isError = true;
       result.stopReason = "aborted";
       result.errorMessage = `Subagent "${agent.name}" was aborted`;
@@ -398,7 +432,6 @@ function registerAgentTool(
         return {
           content: [{ type: "text", text: result.finalOutput || result.errorMessage || "(no output)" }],
           details: result,
-          isError: result.isError,
         };
       } finally {
         running.delete(toolCallId);

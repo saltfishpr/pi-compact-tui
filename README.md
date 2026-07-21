@@ -27,6 +27,7 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 | Quick new session | Use `/clear` to start a new session immediately, just like `/new`. |
 | Automatic Git trust | Automatically trusts projects that match rules based on the domain or username in the `origin` remote URL. |
 | Ark Coding Plan | Registers the `ark-coding-plan` provider, allowing you to select Volcano Ark Coding Plan models directly in Pi. |
+| Subagents | Registers an `agent` tool that delegates focused tasks to specialized subagents running in isolated contexts, with live progress in the TUI. |
 
 ## Optional Configuration
 
@@ -81,6 +82,45 @@ Create `trust.json` and configure the allowed Git domains or usernames:
 ```
 
 Matching is case-insensitive, and a match in either list is sufficient. Only the `origin` remote URL is checked. If no rule matches, Pi continues with its default project trust flow.
+
+### Subagents
+
+Subagents are defined as markdown files. They are discovered from three locations, in increasing precedence (a later definition shadows an earlier one with the same name):
+
+- Built-in: shipped with this package
+- Global: `~/.pi/agent/agents/`
+- Project: `.pi/agents/` (repo-controlled; requires confirmation before each run)
+
+Each file uses YAML frontmatter followed by a markdown body that becomes the subagent's system prompt:
+
+```markdown
+---
+description: Creates concrete implementation plans from context and requirements. Read-only; never edits code.
+tools:
+  - read
+  - grep
+  - find
+  - ls
+model: anthropic/claude-opus-4-5
+effort: high
+skills:
+  - some-skill
+maxTurns: 100
+---
+
+You are a planning specialist...
+```
+
+| Field | Required | Description |
+| --- | --- | --- |
+| `description` | Yes | Explains when to use the subagent; shown to the calling agent. |
+| `tools` | No | Allowlist of tool names. Defaults to `read`, `bash`, `edit`, `write`. |
+| `model` | No | Model override in `provider/id` form. Defaults to the caller's model. |
+| `effort` | No | Reasoning level: `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`. Defaults to Pi's default. |
+| `skills` | No | Skill names preloaded into the subagent's system prompt. Requires the `read` tool to load them. |
+| `maxTurns` | No | Caps the number of assistant turns; the subagent stops once the limit is reached. |
+
+The subagent runs in a fresh context and cannot see the main conversation, so include everything it needs in the task prompt.
 
 ## Updating and Uninstalling
 
