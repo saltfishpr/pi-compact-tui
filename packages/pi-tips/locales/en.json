@@ -1,0 +1,16 @@
+{
+  "tip.label": "Tip",
+  "tip.fork": "Use /fork to branch off a session and explore alternatives.",
+  "tip.model": "Press Ctrl+P or run /model to switch models mid-session.",
+  "tip.thinking": "Use Shift+Tab to cycle reasoning effort (off -> minimal -> low -> medium -> high).",
+  "tip.tree": "Run /tree to navigate the session's branching history.",
+  "tip.name": "Run /name <label> to rename the current session for easier /resume.",
+  "tip.reload": "Run /reload after editing an extension, subagent, or skill.",
+  "tip.agents": "Drop a markdown file into .pi/agents/ to create a project-scoped subagent.",
+  "tip.system": "Add .pi/APPEND_SYSTEM.md in your project root to give Pi persistent instructions.",
+  "tip.history": "Press Shift+Up / Shift+Down to browse your input history across sessions.",
+  "tip.recap": "Run /recap to generate a short summary of the current session.",
+  "tip.trustGit": "Configure ~/.pi/agent/extensions/trust.json to auto-trust projects by Git origin.",
+  "tip.footer": "Customize the footer layout by editing ~/.pi/agent/extensions/footer.json.",
+  "tip.subagent": "Ask Pi to \"use the planner subagent\" to draft a plan grounded in the codebase."
+}

@@ -29,6 +29,7 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 | Ark Coding Plan     | Registers the `ark-coding-plan` provider, allowing you to select Volcano Ark Coding Plan models directly in Pi.                              |
 | Subagents           | Registers an `agent` tool that delegates focused tasks to specialized subagents running in isolated contexts, with live progress in the TUI. |
 | Idle recap          | Generates a short session recap when the session goes idle and renders it in a TUI widget. Trigger it manually with `/recap`.                |
+| Session tips        | Shows a short usage tip at the top of the transcript each time a session starts.                                                             |
 
 ## Optional Configuration
 
@@ -148,6 +149,14 @@ To customize, create `.pi/extensions/pi-recap.json` (project) or `~/.pi/agent/ex
 - `model` — pick a dedicated model in `provider/model` format. Omit to use the current model.
 - `thinkingLevel` — `off` / `minimal` / `low` / `medium` / `high` / `xhigh`.
 - `idle` — how long to wait before triggering, e.g. `"3m"` or `180000`. Minimum 5s.
+
+### Session Tips
+
+Tips are shown in English by default. To switch to Chinese (or any other language shipped by rpiv extensions), install the shared locale extension and run `/languages`:
+
+```bash
+pi install npm:@juicesharp/rpiv-i18n
+```
 
 ## Updating and Uninstalling
 

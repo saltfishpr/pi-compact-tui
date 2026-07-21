@@ -26,6 +26,7 @@
       "./packages/pi-provider-ark/index.ts",
       "./packages/pi-recap/index.ts",
       "./packages/pi-subagent/index.ts",
+      "./packages/pi-tips/index.ts",
       "./packages/pi-trust-git/index.ts"
     ]
   },
@@ -41,12 +42,19 @@
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*"
+    "@earendil-works/pi-tui": "*",
+    "@juicesharp/rpiv-i18n": "*"
+  },
+  "peerDependenciesMeta": {
+    "@juicesharp/rpiv-i18n": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@earendil-works/pi-ai": "^0.80.8",
     "@earendil-works/pi-coding-agent": "^0.80.8",
     "@earendil-works/pi-tui": "^0.80.8",
+    "@juicesharp/rpiv-i18n": "*",
     "@types/ms": "^2.1.0",
     "@types/node": "^26.0.1",
     "@types/write-file-atomic": "^4.0.3",

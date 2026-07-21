@@ -1,0 +1,16 @@
+{
+  "tip.label": "提示",
+  "tip.fork": "使用 /fork 可以从当前会话分叉出一条新分支，方便探索不同方案。",
+  "tip.model": "按 Ctrl+P 或运行 /model 可在会话中途切换模型。",
+  "tip.thinking": "按 Shift+Tab 可循环切换推理档位（off -> minimal -> low -> medium -> high）。",
+  "tip.tree": "运行 /tree 可以浏览当前会话的分支历史。",
+  "tip.name": "运行 /name <名称> 可以给当前会话命名，方便下次 /resume 查找。",
+  "tip.reload": "修改扩展、subagent 或 skill 后，运行 /reload 即可热加载。",
+  "tip.agents": "在 .pi/agents/ 目录下放置 markdown 文件，即可为当前项目定义 subagent。",
+  "tip.system": "在项目根目录添加 .pi/APPEND_SYSTEM.md，可以给 Pi 设定持久化的指令。",
+  "tip.history": "按 Shift+↑ / Shift+↓ 可跨会话浏览输入历史。",
+  "tip.recap": "运行 /recap 可生成当前会话的简要摘要。",
+  "tip.trustGit": "配置 ~/.pi/agent/extensions/trust.json 可按 Git origin 自动信任项目。",
+  "tip.footer": "编辑 ~/.pi/agent/extensions/footer.json 可自定义底部状态栏布局。",
+  "tip.subagent": "让 Pi \"使用 planner subagent\" 可基于当前代码库产出一份实现计划。"
+}
