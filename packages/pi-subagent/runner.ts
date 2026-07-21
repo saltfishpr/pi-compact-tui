@@ -168,16 +168,10 @@ export async function runSubagent(options: RunSubagentOptions): Promise<Subagent
 
   let turnCount = 0;
   let hitMaxTurns = false;
-  let latestOutput = "";
   const unsubscribe = session.subscribe((event) => {
     if (event.type !== "message_end" || event.message.role !== "assistant") return;
 
     onMessage(event.message);
-
-    const textParts = event.message.content
-      .filter((part): part is Extract<typeof part, { type: "text" }> => part.type === "text")
-      .map((part) => part.text);
-    if (textParts.length > 0) latestOutput = textParts.join("\n");
 
     turnCount++;
     if (agent.maxTurns && turnCount >= agent.maxTurns && event.message.stopReason === "toolUse") {
@@ -213,6 +207,7 @@ export async function runSubagent(options: RunSubagentOptions): Promise<Subagent
     const stopReason = session.state.messages
       .filter((message): message is Extract<typeof message, { role: "assistant" }> => message.role === "assistant")
       .at(-1)?.stopReason;
+    const latestOutput = session.getLastAssistantText() ?? "";
     if (hitMaxTurns) {
       result.stopReason = "max_turns";
       if (!latestOutput) {
