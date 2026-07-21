@@ -1,25 +1,8 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import * as z from "zod";
 
-const CONFIG_PATH = join(getAgentDir(), "extensions", "trust.json");
-
-const trustConfigSchema = z.object({
-  domains: z
-    .array(z.string())
-    .default([])
-    .transform((list) => list.map((item) => item.trim().toLowerCase()).filter(Boolean)),
-  usernames: z
-    .array(z.string())
-    .default([])
-    .transform((list) => list.map((item) => item.trim().toLowerCase()).filter(Boolean)),
-});
-
-type TrustConfig = z.infer<typeof trustConfigSchema>;
+import { loadConfig } from "./config";
 
 export interface GitRemoteInfo {
   domain: string;
@@ -79,16 +62,6 @@ export function parseGitRemoteUrl(remoteUrl: string): GitRemoteInfo | undefined 
   return { domain, username, repo: repoName };
 }
 
-function loadTrustConfig(): TrustConfig {
-  if (!existsSync(CONFIG_PATH)) return trustConfigSchema.parse({});
-  try {
-    const value = JSON.parse(readFileSync(CONFIG_PATH, "utf8"));
-    return trustConfigSchema.parse(value);
-  } catch {
-    return trustConfigSchema.parse({});
-  }
-}
-
 function getOriginRemote(cwd: string): string | undefined {
   const result = spawnSync("git", ["remote", "get-url", "origin"], {
     cwd,
@@ -102,7 +75,7 @@ function getOriginRemote(cwd: string): string | undefined {
 
 export default function (pi: ExtensionAPI) {
   pi.on("project_trust", async (event, ctx) => {
-    const config = loadTrustConfig();
+    const config = loadConfig();
 
     const remoteUrl = getOriginRemote(event.cwd);
     const remote = remoteUrl ? parseGitRemoteUrl(remoteUrl) : undefined;
