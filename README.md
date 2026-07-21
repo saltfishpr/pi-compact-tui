@@ -89,7 +89,9 @@ Subagents are defined as markdown files. They are discovered from three location
 
 - Built-in: shipped with this package
 - Global: `~/.pi/agent/agents/`
-- Project: `.pi/agents/` (repo-controlled; requires confirmation before each run)
+- Project: `.pi/agents/` (repo-controlled; loaded only when Pi trusts the project)
+
+The catalog is fixed when the session starts. Use `/reload` after changing an agent file. Invalid definitions are skipped and reported.
 
 Each file uses YAML frontmatter followed by a markdown body that becomes the subagent's system prompt:
 
@@ -114,13 +116,15 @@ You are a planning specialist...
 | Field | Required | Description |
 | --- | --- | --- |
 | `description` | Yes | Explains when to use the subagent; shown to the calling agent. |
-| `tools` | No | Allowlist of tool names. Defaults to `read`, `bash`, `edit`, `write`. |
+| `tools` | No | Built-in tool allowlist. Defaults to all built-in tools: `read`, `bash`, `edit`, `write`, `grep`, `find`, and `ls`. |
 | `model` | No | Model override in `provider/id` form. Defaults to the caller's model. |
-| `effort` | No | Reasoning level: `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`. Defaults to Pi's default. |
+| `effort` | No | Reasoning level: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`. Defaults to the caller's current level. |
 | `skills` | No | Skill names preloaded into the subagent's system prompt. Requires the `read` tool to load them. |
-| `maxTurns` | No | Caps the number of assistant turns; the subagent stops once the limit is reached. |
+| `maxTurns` | No | Prevents continuation beyond this many assistant turns; a final answer on the last allowed turn still succeeds. |
 
-The subagent runs in a fresh context and cannot see the main conversation, so include everything it needs in the task prompt.
+Explicitly configured models, skills, and tools must be available or the run is rejected. The subagent runs in a fresh context and cannot see the main conversation. Its system prompt contains only the definition body and configured skills, so include all other task context in `prompt`.
+
+Tool output is limited to Pi's default 2,000 lines or 50 KB. When truncated, the complete output is written to a temporary file and its path is included in the result.
 
 ## Updating and Uninstalling
 

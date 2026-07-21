@@ -89,7 +89,9 @@ export ARK_API_KEY="your-api-key"
 
 - 内置：随本扩展一起提供
 - 全局：`~/.pi/agent/agents/`
-- 项目：`.pi/agents/`（受仓库控制；每次运行前需确认）
+- 项目：`.pi/agents/`（受仓库控制；仅在 Pi 信任当前项目时加载）
+
+agent catalog 在会话启动时固定。修改 agent 文件后需执行 `/reload`；非法定义会被跳过并报告。
 
 每个文件由 YAML frontmatter 加 markdown 正文组成，正文作为子代理的 system prompt：
 
@@ -114,13 +116,15 @@ You are a planning specialist...
 | 字段          | 必填 | 说明                                                                     |
 | ------------- | ---- | ------------------------------------------------------------------------ |
 | `description` | 是   | 说明何时使用该子代理，会展示给调用方。                                    |
-| `tools`       | 否   | 工具白名单。默认为 `read`、`bash`、`edit`、`write`。                      |
+| `tools`       | 否   | 内置工具白名单。默认开放全部内置工具：`read`、`bash`、`edit`、`write`、`grep`、`find`、`ls`。 |
 | `model`       | 否   | `provider/id` 形式的模型覆盖。默认沿用调用方模型。                        |
-| `effort`      | 否   | 推理级别：`minimal`、`low`、`medium`、`high`、`xhigh`、`max`。默认取 Pi 默认值。 |
+| `effort`      | 否   | 推理级别：`off`、`minimal`、`low`、`medium`、`high`、`xhigh`、`max`。默认继承调用方当前档位。 |
 | `skills`      | 否   | 预加载到子代理 system prompt 的 skill 名称。需 `read` 工具才能加载。      |
-| `maxTurns`    | 否   | 限制 assistant 轮数，达到上限后子代理停止。                               |
+| `maxTurns`    | 否   | 阻止超过指定 assistant 轮数的续轮；最后一个允许轮次自然完成仍视为成功。   |
 
-子代理在全新上下文中运行，看不到主对话，因此需把它所需的一切都写进任务 prompt。
+显式配置的 model、skill 或 tool 不可用时会拒绝运行。子代理在全新上下文中运行，看不到主对话；其 system prompt 只包含定义正文与配置的 skills，因此其他任务上下文都需写入 `prompt`。
+
+工具输出遵循 Pi 默认的 2,000 行或 50 KB 上限。发生截断时，完整输出会写入临时文件，并在结果中附上路径。
 
 ## 更新与卸载
 
