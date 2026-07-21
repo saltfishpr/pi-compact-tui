@@ -25,8 +25,6 @@ pi-compact-tui/
 └── README.zh.md                     # 中文说明
 ```
 
-每个 extension 是一个独立的 TypeScript 文件，导出默认函数，接收 `ExtensionAPI`。带 `config.ts` 的 extension 会在 `~/.pi/agent/extensions/` 下读写自己的 JSON 配置。
-
 ### 关键技术栈
 
 - **语言**: TypeScript（通过 jiti 运行时加载，无需编译）
