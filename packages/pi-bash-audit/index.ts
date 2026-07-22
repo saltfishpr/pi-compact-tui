@@ -58,5 +58,8 @@ export default function (pi: ExtensionAPI) {
       );
       return proceed ? undefined : { block: true, reason: `bash-audit: high risk - ${result.reason}` };
     }
+
+    const level = result.risk === "medium" ? "warning" : "info";
+    ctx.ui.notify(`[bash-audit] ${result.risk}: ${result.reason}`, level);
   });
 }
