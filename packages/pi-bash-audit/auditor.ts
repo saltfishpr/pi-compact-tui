@@ -167,7 +167,7 @@ export async function auditCommand(options: AuditCommandOptions): Promise<AuditR
       parsed = JSON.parse(text) as { risk?: unknown; reason?: unknown };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      return { kind: "failed", reason: `invalid audit JSON: ${message}` };
+      return { kind: "failed", reason: `invalid audit JSON: ${message}\n${text}` };
     }
 
     if (

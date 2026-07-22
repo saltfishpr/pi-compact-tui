@@ -1,8 +1,8 @@
-import {
-  type ExtensionAPI,
-  type ExtensionContext,
-  type ReadonlyFooterDataProvider,
-  type Theme,
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+  ReadonlyFooterDataProvider,
+  Theme,
 } from "@earendil-works/pi-coding-agent";
 import type { Component, TUI } from "@earendil-works/pi-tui";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
