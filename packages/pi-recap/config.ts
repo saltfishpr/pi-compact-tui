@@ -1,4 +1,3 @@
-import type { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { CONFIG_DIR_NAME, getAgentDir } from "@earendil-works/pi-coding-agent";
 import { defu } from "defu";
 import type { StringValue } from "ms";
@@ -6,26 +5,9 @@ import ms from "ms";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as z from "zod";
+import { modelSchema } from "../pi-common";
 
 const CONFIG_FILE_NAME = "recap.json";
-
-const THINKING_LEVELS = [
-  "off",
-  "minimal",
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-] as const satisfies readonly ModelThinkingLevel[];
-
-export const modelSchema = z.object({
-  model: z.string().min(1),
-  thinkingLevel: z.enum(THINKING_LEVELS),
-});
-
-export const optionalModelSchema = modelSchema.partial();
-
-export type OptionalModelConfig = z.infer<typeof optionalModelSchema>;
 
 // 设置一个下限，避免误配置导致 idle 触发过于频繁。
 const MIN_IDLE_MS = 5_000;
@@ -58,7 +40,7 @@ export const idleTimeoutSchema = z
   })
   .pipe(z.number().min(MIN_IDLE_MS));
 
-export const recapConfigSchema = optionalModelSchema.extend({
+export const recapConfigSchema = modelSchema.extend({
   idle: idleTimeoutSchema.optional(),
 });
 

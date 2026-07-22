@@ -4,15 +4,11 @@ import { join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import * as z from "zod";
 
+import { modelSchema } from "../pi-common";
+
 const CONFIG_FILE_NAME = "bash-audit.json";
 
-export const bashAuditConfigSchema = z.object({
-  model: z
-    .string()
-    .regex(/^[^/]+\/.+$/, `expected "provider/model-id"`)
-    .optional(),
-  thinkingLevel: z.enum(["off", "minimal", "low", "medium", "high", "xhigh", "max"]).optional(),
-});
+export const bashAuditConfigSchema = modelSchema;
 
 export type BashAuditConfig = z.infer<typeof bashAuditConfigSchema>;
 

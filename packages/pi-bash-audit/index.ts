@@ -1,28 +1,29 @@
-import { clampThinkingLevel, type Model, type ModelThinkingLevel } from "@earendil-works/pi-ai";
+import type { Api, Model, ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { type ExtensionAPI, isToolCallEventType } from "@earendil-works/pi-coding-agent";
 
+import { resolveModel } from "../pi-common";
 import { auditCommand, isReadOnlyCommand } from "./auditor";
 import { loadConfig } from "./config";
 
 export default function (pi: ExtensionAPI) {
-  let resolvedModel: Model<any>;
+  let resolvedModel: Model<Api> | undefined;
   let thinkingLevel: ModelThinkingLevel = "off";
 
   pi.on("session_start", async (_event, ctx) => {
     const config = loadConfig();
 
-    if (config.model) {
-      const [provider, ...modelId] = config.model.split("/");
-      const found = ctx.modelRegistry.find(provider, modelId.join("/"));
-      if (!found) {
-        ctx.ui.notify(`[bash-audit] model "${config.model}" not found, falling back to current model`, "warning");
-        return;
+    const resolved = resolveModel(ctx, {
+      model: config.model,
+      thinkingLevel: config.thinkingLevel,
+    });
+    if (!resolved) {
+      if (config.model) {
+        ctx.ui.notify(`[bash-audit] model "${config.model}" not found, bash-audit disabled`, "warning");
       }
-      resolvedModel = found;
+      return;
     }
-    if (config.thinkingLevel) {
-      thinkingLevel = clampThinkingLevel(resolvedModel, config.thinkingLevel);
-    }
+    resolvedModel = resolved.model;
+    thinkingLevel = resolved.thinkingLevel;
   });
 
   pi.on("tool_call", async (event, ctx) => {

@@ -1,6 +1,7 @@
-import { clampThinkingLevel, Message, StringEnum, Type } from "@earendil-works/pi-ai";
+import { Message, StringEnum, Type } from "@earendil-works/pi-ai";
 import { type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 
+import { resolveModel } from "../pi-common";
 import { discoverAgents, type AgentDiagnostic, type LoadedAgent } from "./agents";
 import { loadConfig } from "./config";
 import { renderSubagentCall, renderSubagentResult, updateSubagentWidget } from "./render";
@@ -72,17 +73,16 @@ function registerAgentTool(
 
       const agentNumber = nextAgentNumber++;
 
-      let model = ctx.model;
-      if (agent.model) {
-        const [provider, ...modelId] = agent.model.split("/");
-        model = ctx.modelRegistry.find(provider, modelId.join("/"));
+      const resolved = resolveModel(ctx, {
+        model: agent.model,
+        thinkingLevel: agent.effort,
+        fallbackModel: ctx.model,
+        fallbackThinkingLevel: pi.getThinkingLevel(),
+      });
+      if (!resolved) {
+        throw new Error(`No valid model for subagent "${agent.name}" (configured: ${agent.model ?? "inherit"})`);
       }
-      if (!model) {
-        const errorMessage = `No valid model for subagent "${agent.name}" (configured: ${agent.model ?? "inherit"})`;
-        throw new Error(errorMessage);
-      }
-      const requestedLevel = agent.effort ?? pi.getThinkingLevel();
-      const thinkingLevel = clampThinkingLevel(model, requestedLevel);
+      const { model, thinkingLevel } = resolved;
 
       running.set(toolCallId, {
         number: agentNumber,

@@ -4,19 +4,16 @@ import { basename, join } from "node:path";
 import { CONFIG_DIR_NAME, getAgentDir, parseFrontmatter } from "@earendil-works/pi-coding-agent";
 import * as z from "zod";
 
+import { modelSchema, THINKING_LEVELS } from "../pi-common";
+
 const BUILTIN_AGENTS_DIR = join(import.meta.dirname, "agents");
 const GLOBAL_AGENTS_DIR = join(getAgentDir(), "agents");
-
-export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
 
 const frontmatterSchema = z.object({
   description: z.string().min(1),
   tools: z.array(z.string().min(1)).optional(),
   skills: z.array(z.string().min(1)).optional(),
-  model: z
-    .string()
-    .regex(/^[^/]+\/.+$/)
-    .optional(),
+  model: modelSchema.shape.model,
   effort: z.enum(THINKING_LEVELS).optional(),
   maxTurns: z.number().int().positive().optional(),
 });

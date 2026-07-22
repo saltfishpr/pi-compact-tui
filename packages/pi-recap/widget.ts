@@ -6,13 +6,11 @@ const WIDGET_KEY = "pi-recap";
 /**
  * 设置 recap 的加载中 widget。
  *
- * 在 UI 上挂载一个带动画的 Loader，提示 "Generating recap..."；
- * 若提供 `warning`，则在 loader 之后以告警样式追加显示。
+ * 在 UI 上挂载一个带动画的 Loader，提示 "Generating recap..."。
  *
- * @param ctx     扩展上下文，用于挂载 widget。
- * @param warning 可选的告警信息，会以醒目样式拼接在 loader 后。
+ * @param ctx 扩展上下文，用于挂载 widget。
  */
-export function setRecapLoadingWidget(ctx: ExtensionContext, warning?: string): void {
+export function setRecapLoadingWidget(ctx: ExtensionContext): void {
   ctx.ui.setWidget(WIDGET_KEY, (tui, theme) => {
     const loader = new Loader(
       tui,
@@ -20,17 +18,12 @@ export function setRecapLoadingWidget(ctx: ExtensionContext, warning?: string): 
       (text) => theme.fg("muted", text),
       "Generating recap...",
     );
-    loader.start();
 
     return {
       render: (width: number) => {
         const lines = loader.render(width);
         if (lines[0] === "") lines.shift();
-
-        const loaderLine = (lines[0] ?? "").trimEnd();
-        const line = `${loaderLine}${warning ? ` ${theme.fg("warning", `(Warning: ${warning})`)}` : ""}`;
-
-        return [truncateToWidth(line, width), ""];
+        return [truncateToWidth(lines[0] ?? "", width), ""];
       },
       invalidate: () => loader.invalidate(),
       dispose: () => loader.stop(),
