@@ -1,4 +1,4 @@
-import type { Model, ModelThinkingLevel } from "@earendil-works/pi-ai";
+import { clampThinkingLevel, type Model, type ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { type ExtensionAPI, isToolCallEventType } from "@earendil-works/pi-coding-agent";
 
 import { auditCommand, isReadOnlyCommand } from "./auditor";
@@ -11,7 +11,6 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
     const config = loadConfig();
 
-    if (config.thinkingLevel) thinkingLevel = config.thinkingLevel;
     if (config.model) {
       const [provider, ...modelId] = config.model.split("/");
       const found = ctx.modelRegistry.find(provider, modelId.join("/"));
@@ -20,6 +19,9 @@ export default function (pi: ExtensionAPI) {
         return;
       }
       resolvedModel = found;
+    }
+    if (config.thinkingLevel) {
+      thinkingLevel = clampThinkingLevel(resolvedModel, config.thinkingLevel);
     }
   });
 
