@@ -1,4 +1,4 @@
-import { Message, StringEnum, Type } from "@earendil-works/pi-ai";
+import { clampThinkingLevel, Message, StringEnum, Type } from "@earendil-works/pi-ai";
 import { type ExtensionAPI, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 import { discoverAgents, type AgentDiagnostic, type LoadedAgent } from "./agents";
@@ -71,6 +71,19 @@ function registerAgentTool(
       if (!agent) throw new Error(`Unknown subagent: ${params.name}`);
 
       const agentNumber = nextAgentNumber++;
+
+      let model = ctx.model;
+      if (agent.model) {
+        const [provider, ...modelId] = agent.model.split("/");
+        model = ctx.modelRegistry.find(provider, modelId.join("/"));
+      }
+      if (!model) {
+        const errorMessage = `No valid model for subagent "${agent.name}" (configured: ${agent.model ?? "inherit"})`;
+        throw new Error(errorMessage);
+      }
+      const requestedLevel = agent.effort ?? pi.getThinkingLevel();
+      const thinkingLevel = clampThinkingLevel(model, requestedLevel);
+
       running.set(toolCallId, {
         number: agentNumber,
         agent: agent.name,
@@ -85,13 +98,6 @@ function registerAgentTool(
         current.messages.push(message);
         updateSubagentWidget(ctx, running);
       };
-
-      let model = ctx.model;
-      if (agent.model) {
-        const [provider, ...modelId] = agent.model.split("/");
-        model = ctx.modelRegistry.find(provider, modelId.join("/"));
-      }
-      const thinkingLevel = agent.effort ?? pi.getThinkingLevel();
 
       try {
         const result = await runSubagent({

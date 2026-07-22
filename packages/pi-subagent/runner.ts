@@ -43,10 +43,10 @@ export interface SubagentResult {
   source: AgentSource;
   task: string;
   finalOutput: string;
+  model?: string;
   stopReason?: string;
   errorMessage?: string;
   usage?: UsageStats;
-  model?: string;
   truncation?: TruncationResult;
   fullOutputPath?: string;
   isError: boolean;
@@ -58,7 +58,7 @@ export interface RunSubagentOptions {
   task: string;
   signal?: AbortSignal;
   cwd: string;
-  model?: Model<any>;
+  model: Model<any>;
   thinkingLevel: ModelThinkingLevel;
   onMessage: (message: Message) => void;
 }
@@ -104,15 +104,9 @@ export async function runSubagent(options: RunSubagentOptions): Promise<Subagent
     source: agent.source,
     task,
     finalOutput: "",
+    model: `${model.provider}/${model.id}`,
     isError: false,
   };
-
-  if (!model) {
-    result.isError = true;
-    result.errorMessage = `No valid model for subagent "${agent.name}" (configured: ${agent.model ?? "inherit"})`;
-    return result;
-  }
-  result.model = `${model.provider}/${model.id}`;
 
   const supportedTools = getSupportedToolNames(cwd);
   const selectedTools = agent.tools ?? supportedTools;
