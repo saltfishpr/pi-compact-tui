@@ -19,6 +19,8 @@ export default function (pi: ExtensionAPI) {
     if (!resolved) {
       if (config.model) {
         ctx.ui.notify(`[bash-audit] model "${config.model}" not found, bash-audit disabled`, "warning");
+      } else {
+        ctx.ui.notify(`[bash-audit] no model configured, bash-audit disabled`, "warning");
       }
       return;
     }
