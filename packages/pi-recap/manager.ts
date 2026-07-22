@@ -1,4 +1,4 @@
-import type { Api, Model, ModelThinkingLevel, SimpleStreamOptions, Usage } from "@earendil-works/pi-ai";
+import type { Api, Message, Model, ModelThinkingLevel, SimpleStreamOptions, Usage } from "@earendil-works/pi-ai";
 import { completeSimple } from "@earendil-works/pi-ai/compat";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { convertToLlm, serializeConversation } from "@earendil-works/pi-coding-agent";
@@ -52,6 +52,15 @@ export class RecapManager {
   async run(ctx: ExtensionContext, options: { force?: boolean } = {}): Promise<void> {
     if (this.active && !options.force) return;
 
+    const agentMessages = ctx.sessionManager
+      .getBranch()
+      .filter((entry) => entry.type === "message")
+      .map((entry) => entry.message);
+    const messages = convertToLlm(agentMessages);
+
+    // 会话中没有消息时跳过 recap，避免无意义的模型调用。
+    if (messages.length === 0) return;
+
     this.cancelInflight();
     const controller = new AbortController();
     this.inflight = controller;
@@ -71,7 +80,7 @@ export class RecapManager {
       // 进入生成阶段，旧 recap 视为失效。
       this.active = false;
 
-      const result = await this.generate(ctx, model, thinkingLevel, controller.signal);
+      const result = await this.generate(ctx, messages, model, thinkingLevel, controller.signal);
       if (controller.signal.aborted || this.inflight !== controller) return;
 
       if (result.kind === "aborted") {
@@ -114,6 +123,7 @@ export class RecapManager {
 
   private async generate(
     ctx: ExtensionContext,
+    messages: Message[],
     model: Model<Api>,
     thinkingLevel: ModelThinkingLevel,
     signal: AbortSignal,
@@ -135,7 +145,7 @@ export class RecapManager {
           messages: [
             {
               role: "user",
-              content: [{ type: "text", text: this.buildPrompt(ctx) }],
+              content: [{ type: "text", text: this.buildPrompt(messages) }],
               timestamp: Date.now(),
             },
           ],
@@ -159,12 +169,8 @@ export class RecapManager {
   }
 
   // 从当前会话分支构造提示词：过滤出消息条目并按时间序列化，必要时尾部截断。
-  private buildPrompt(ctx: ExtensionContext): string {
-    const messages = ctx.sessionManager
-      .getBranch()
-      .filter((entry) => entry.type === "message")
-      .map((entry) => entry.message);
-    const text = serializeConversation(convertToLlm(messages));
+  private buildPrompt(messages: Message[]): string {
+    const text = serializeConversation(messages);
     // 超长时保留末尾片段，确保最近的任务上下文不被丢弃。
     const conversation = text.length > MAX_CONVERSATION_CHARS ? text.slice(-MAX_CONVERSATION_CHARS) : text;
 
