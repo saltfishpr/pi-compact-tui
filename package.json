@@ -17,6 +17,7 @@
   },
   "pi": {
     "extensions": [
+      "./packages/pi-bash-audit/index.ts",
       "./packages/pi-clear-command/index.ts",
       "./packages/pi-codex-stats/index.ts",
       "./packages/pi-compact-editor/index.ts",
@@ -31,6 +32,7 @@
     ]
   },
   "scripts": {
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -58,6 +60,7 @@
     "@types/ms": "^2.1.0",
     "@types/node": "^26.0.1",
     "@types/write-file-atomic": "^4.0.3",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
   }
 }
