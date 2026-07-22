@@ -1,6 +1,6 @@
 {
   "name": "pi-compact-tui",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Pi extension bundle with compact, distraction-free editor and footer components for a focused coding experience",
   "keywords": [
     "pi-package"
