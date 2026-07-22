@@ -31,6 +31,7 @@ export default function (pi: ExtensionAPI) {
     if (!command || isReadOnlyCommand(command)) return;
 
     const result = await auditCommand({
+      ctx,
       command,
       cwd: ctx.cwd,
       model: resolvedModel,
