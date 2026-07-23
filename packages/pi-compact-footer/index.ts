@@ -232,7 +232,7 @@ class ConfigurableFooter implements Component {
 
 export default function (pi: ExtensionAPI) {
   pi.on("session_start", (_event, ctx) => {
-    if (ctx.mode !== "tui") return;
+    if (!ctx.hasUI) return;
 
     const config = loadConfig();
     ctx.ui.setFooter((_tui: TUI, theme: Theme, footerData: ReadonlyFooterDataProvider) => {
@@ -247,7 +247,8 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("session_shutdown", (_event, ctx) => {
-    if (ctx.mode !== "tui") return;
+    if (!ctx.hasUI) return;
+
     ctx.ui.setFooter(undefined);
   });
 }

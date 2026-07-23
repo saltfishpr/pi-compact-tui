@@ -43,6 +43,18 @@ export default function (pi: ExtensionAPI) {
     }
   });
 
+  pi.on("agent_settled", (_event, ctx) => {
+    idleListener?.watch(ctx);
+  });
+
+  pi.on("session_compact", (_event, ctx) => {
+    idleListener?.watch(ctx);
+  });
+
+  pi.on("session_tree", (_event, ctx) => {
+    idleListener?.watch(ctx);
+  });
+
   pi.on("input", (_event, ctx) => {
     idleListener?.wake(ctx);
   });
@@ -61,18 +73,6 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("session_before_tree", (_event, ctx) => {
     idleListener?.wake(ctx);
-  });
-
-  pi.on("agent_end", (_event, ctx) => {
-    idleListener?.watch(ctx);
-  });
-
-  pi.on("session_compact", (_event, ctx) => {
-    idleListener?.watch(ctx);
-  });
-
-  pi.on("session_tree", (_event, ctx) => {
-    idleListener?.watch(ctx);
   });
 
   pi.on("session_shutdown", (_event, ctx) => {

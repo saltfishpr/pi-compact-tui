@@ -107,7 +107,7 @@ export default function (pi: ExtensionAPI) {
   const runningTools = new Map<string, string>();
 
   pi.on("session_start", (_event, ctx) => {
-    if (ctx.mode !== "tui") return;
+    if (!ctx.hasUI) return;
 
     ctx.ui.setWorkingVisible(false);
     const model = formatModel(ctx.model, pi.getThinkingLevel());
@@ -118,13 +118,13 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("model_select", (event, ctx) => {
-    if (ctx.mode !== "tui") return;
+    if (!ctx.hasUI) return;
 
     editor?.setModel(formatModel(event.model, pi.getThinkingLevel()));
   });
 
   pi.on("thinking_level_select", (event, ctx) => {
-    if (ctx.mode !== "tui") return;
+    if (!ctx.hasUI) return;
 
     editor?.setModel(formatModel(ctx.model, event.level));
   });
@@ -175,7 +175,7 @@ export default function (pi: ExtensionAPI) {
     }
   });
 
-  pi.on("agent_end", () => {
+  pi.on("agent_settled", () => {
     runningTools.clear();
     editor?.stopWorking();
   });

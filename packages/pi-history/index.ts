@@ -84,7 +84,7 @@ export default function (pi: ExtensionAPI) {
   }
 
   pi.on("session_start", (_event, ctx) => {
-    if (ctx.mode !== "tui" || !claimShortcutHint(shortcutHintFile)) return;
+    if (!ctx.hasUI || !claimShortcutHint(shortcutHintFile)) return;
     ctx.ui.notify("历史输入快捷键：shift+↑ 上一条，shift+↓ 下一条", "info");
   });
 
