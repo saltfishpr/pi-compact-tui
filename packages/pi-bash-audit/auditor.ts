@@ -134,6 +134,17 @@ export async function auditCommand(options: AuditCommandOptions): Promise<AuditR
       apiKey: auth.apiKey,
       maxTokens: MAX_TOKENS,
       signal: controller.signal,
+      onPayload(payload, requestModel) {
+        switch (requestModel.provider) {
+          case "deepseek":
+            if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+              return undefined;
+            }
+            return { ...payload, response_format: { type: "json_object" } };
+          default:
+            return undefined;
+        }
+      },
     };
     if (auth.headers) streamOptions.headers = auth.headers;
     if (auth.env) streamOptions.env = auth.env;
