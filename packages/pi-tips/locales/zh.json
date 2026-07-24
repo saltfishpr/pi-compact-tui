@@ -12,5 +12,6 @@
   "tip.recap": "运行 /recap 可生成当前会话的简要摘要。",
   "tip.trustGit": "配置 ~/.pi/agent/extensions/trust.json 可按 Git origin 自动信任项目。",
   "tip.footer": "编辑 ~/.pi/agent/extensions/footer.json 可自定义底部状态栏布局。",
-  "tip.subagent": "让 Pi \"使用 planner subagent\" 可基于当前代码库产出一份实现计划。"
+  "tip.subagent": "让 Pi \"使用 planner subagent\" 可基于当前代码库产出一份实现计划。",
+  "tip.bashAudit": "配置 ~/.pi/agent/extensions/bash-audit.json 可启用 LLM 驱动的 bash 命令安全审计。"
 }
