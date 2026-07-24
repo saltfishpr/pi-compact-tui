@@ -2,8 +2,9 @@ import type { Api, Model, ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { type ExtensionAPI, isToolCallEventType } from "@earendil-works/pi-coding-agent";
 
 import { resolveModel } from "../pi-common";
-import { auditCommand, isReadOnlyCommand } from "./auditor";
+import { auditCommand } from "./auditor";
 import { loadConfig } from "./config";
+import { isReadOnly } from "./shell";
 
 export default function (pi: ExtensionAPI) {
   let resolvedModel: Model<Api> | undefined;
@@ -33,7 +34,7 @@ export default function (pi: ExtensionAPI) {
     if (!resolvedModel) return;
 
     const command = event.input.command;
-    if (!command || isReadOnlyCommand(command)) return;
+    if (!command || isReadOnly(command)) return;
 
     const result = await auditCommand({
       ctx,
