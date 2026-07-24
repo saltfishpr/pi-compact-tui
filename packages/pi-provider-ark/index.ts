@@ -8,6 +8,7 @@ const PROVIDER_NAME = "Ark Coding Plan";
 const BASE_URL = "https://ark.cn-beijing.volces.com/api/coding/v3";
 const DEFAULT_CONTEXT_WINDOW = 128_000;
 const DEFAULT_MAX_TOKENS = 16_384;
+const MODELS_FRESHNESS_MS = 4 * 60 * 60 * 1000; // 4 小时
 
 const ZERO_COST = {
   input: 0,
@@ -83,7 +84,7 @@ function toPiModel(model: ArkModel): Model<"openai-completions"> {
 
 export default function registerArkProvider(pi: ExtensionAPI): void {
   pi.registerProvider(
-    createProvider<"openai-completions">({
+    createProvider({
       id: PROVIDER_ID,
       name: PROVIDER_NAME,
       api: openAICompletionsApi(),
@@ -108,9 +109,17 @@ export default function registerArkProvider(pi: ExtensionAPI): void {
         },
       },
       models: [],
-      async fetchModels({ credential, signal }) {
+      async fetchModels({ credential, store, force, signal }) {
         if (credential?.type !== "api_key" || !credential.key) {
-          throw new Error("Ark API key is required to fetch models");
+          return [];
+        }
+
+        // 检查缓存新鲜度，未过期则直接返回缓存
+        if (!force) {
+          const cached = await store.read();
+          if (cached?.checkedAt && Date.now() - cached.checkedAt < MODELS_FRESHNESS_MS) {
+            return cached.models.filter((model) => model.provider === PROVIDER_ID);
+          }
         }
 
         const response = await fetch(`${BASE_URL}/models`, {
