@@ -1,10 +1,12 @@
 import type { Api, Model, ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { type ExtensionAPI, isToolCallEventType } from "@earendil-works/pi-coding-agent";
 
-import { resolveModel } from "../pi-common";
+import { createLogger, resolveModel } from "../pi-common";
 import { auditCommand } from "./auditor";
 import { loadConfig } from "./config";
 import { isReadOnly } from "./shell";
+
+const logger = createLogger("pi-bash-audit");
 
 export default function (pi: ExtensionAPI) {
   let resolvedModel: Model<Api> | undefined;
@@ -43,6 +45,14 @@ export default function (pi: ExtensionAPI) {
       model: resolvedModel,
       thinkingLevel,
       signal: ctx.signal,
+    });
+
+    logger.info("audit", {
+      cwd: ctx.cwd,
+      command,
+      kind: result.kind,
+      risk: result.kind === "ok" ? result.risk : undefined,
+      text: result.kind === "aborted" ? undefined : result.text,
     });
 
     if (result.kind === "aborted") {

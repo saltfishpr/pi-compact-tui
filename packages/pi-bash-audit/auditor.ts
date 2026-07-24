@@ -5,8 +5,8 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 export type AuditRisk = "low" | "medium" | "high";
 
 export type AuditResult =
-  | { kind: "ok"; risk: AuditRisk; reason: string }
-  | { kind: "failed"; reason: string }
+  | { kind: "ok"; risk: AuditRisk; reason: string; text: string }
+  | { kind: "failed"; reason: string; text?: string }
   | { kind: "aborted" };
 
 const AUDIT_TIMEOUT_MS = 10_000;
@@ -104,17 +104,17 @@ export async function auditCommand(options: AuditCommandOptions): Promise<AuditR
       parsed = JSON.parse(text) as { risk?: unknown; reason?: unknown };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      return { kind: "failed", reason: `invalid audit JSON: ${message}\n${text}` };
+      return { kind: "failed", reason: `invalid audit JSON: ${message}`, text };
     }
 
     if (
       (parsed.risk !== "low" && parsed.risk !== "medium" && parsed.risk !== "high") ||
       typeof parsed.reason !== "string"
     ) {
-      return { kind: "failed", reason: "invalid audit JSON shape" };
+      return { kind: "failed", reason: "invalid audit JSON shape", text };
     }
 
-    return { kind: "ok", risk: parsed.risk, reason: parsed.reason };
+    return { kind: "ok", risk: parsed.risk, reason: parsed.reason, text };
   } catch (error) {
     // 超时或外部 abort 都会体现在 controller.signal.aborted 上，区分后再回报。
     if (controller.signal.aborted) {
