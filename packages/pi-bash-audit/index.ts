@@ -1,5 +1,6 @@
 import type { Api, Model, ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { type ExtensionAPI, isToolCallEventType } from "@earendil-works/pi-coding-agent";
+import { Container, Text } from "@earendil-works/pi-tui";
 
 import { createLogger, resolveModel } from "../pi-common";
 import { auditCommand } from "./auditor";
@@ -8,9 +9,24 @@ import { isReadOnly } from "./shell";
 
 const logger = createLogger("pi-bash-audit");
 
+const ENTRY_TYPE = "pi-bash-audit";
+
+type AuditEntryData = {
+  risk: "low" | "medium";
+  message: string;
+};
+
 export default function (pi: ExtensionAPI) {
   let resolvedModel: Model<Api> | undefined;
   let thinkingLevel: ModelThinkingLevel = "off";
+
+  pi.registerEntryRenderer<AuditEntryData>(ENTRY_TYPE, (entry, _options, theme) => {
+    const data = entry.data;
+    if (!data) return new Container();
+
+    const color = data.risk === "medium" ? "warning" : "dim";
+    return new Text(theme.fg(color, `[bash-audit] ${data.message}`), 0, 0);
+  });
 
   pi.on("session_start", async (_event, ctx) => {
     const config = loadConfig();
@@ -75,7 +91,9 @@ export default function (pi: ExtensionAPI) {
       return proceed ? undefined : { block: true, reason: `bash-audit: high risk - ${result.reason}` };
     }
 
-    const level = result.risk === "medium" ? "warning" : "info";
-    ctx.ui.notify(`[bash-audit] ${result.risk}: ${result.reason}`, level);
+    pi.appendEntry<AuditEntryData>(ENTRY_TYPE, {
+      risk: result.risk,
+      message: `${result.risk}: ${result.reason}`,
+    });
   });
 }
