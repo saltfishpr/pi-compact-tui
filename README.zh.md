@@ -179,11 +179,13 @@ effort: high
 
 ```json
 {
+  "enable": true,
   "model": "openai/gpt-4o-mini",
   "thinkingLevel": "off"
 }
 ```
 
+- `enable` — 可选，默认为 `true`；设为 `false` 可在保留配置的同时关闭审计。
 - `model` — 启用审计所必需，格式为 `provider/model`。
 - `thinkingLevel` — 可选，可设为 `off`、`minimal`、`low`、`medium`、`high`、`xhigh` 或 `max`。
 

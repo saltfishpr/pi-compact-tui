@@ -179,11 +179,13 @@ Project definitions require a trusted project. Name conflicts are resolved in th
 
 ```json
 {
+  "enable": true,
   "model": "openai/gpt-4o-mini",
   "thinkingLevel": "off"
 }
 ```
 
+- `enable` — optional; defaults to `true`. Set it to `false` to disable auditing while keeping the configuration.
 - `model` — required to enable auditing, in `provider/model` format.
 - `thinkingLevel` — optional; `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`.
 

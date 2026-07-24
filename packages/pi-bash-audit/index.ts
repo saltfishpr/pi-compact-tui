@@ -30,6 +30,7 @@ export default function (pi: ExtensionAPI) {
 
   pi.on("session_start", async (_event, ctx) => {
     const config = loadConfig();
+    if (!config.enable) return;
 
     const resolved = resolveModel(ctx, {
       model: config.model,

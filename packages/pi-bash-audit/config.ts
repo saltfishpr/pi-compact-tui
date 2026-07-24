@@ -8,7 +8,9 @@ import { modelSchema } from "../pi-common";
 
 const CONFIG_FILE_NAME = "bash-audit.json";
 
-export const bashAuditConfigSchema = modelSchema;
+export const bashAuditConfigSchema = modelSchema.extend({
+  enable: z.boolean().default(true),
+});
 
 export type BashAuditConfig = z.infer<typeof bashAuditConfigSchema>;
 
@@ -19,7 +21,7 @@ export type BashAuditConfig = z.infer<typeof bashAuditConfigSchema>;
  */
 export function loadConfig(): BashAuditConfig {
   const path = join(getAgentDir(), "extensions", CONFIG_FILE_NAME);
-  if (!existsSync(path)) return {};
+  if (!existsSync(path)) return bashAuditConfigSchema.parse({});
   const raw = JSON.parse(readFileSync(path, "utf8")) as unknown;
   return bashAuditConfigSchema.parse(raw);
 }
