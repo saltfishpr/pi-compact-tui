@@ -27,6 +27,9 @@ describe("isReadOnly", () => {
       "hostname -s",
       "date '+%Y-%m-%dT%H:%M:%SZ'",
       "date -u",
+      "cd src",
+      "cd /tmp",
+      "cd ..",
     ])("allows %j", (source) => {
       expect(isReadOnly(source)).toBe(true);
     });
@@ -142,6 +145,7 @@ describe("isReadOnly", () => {
       "[[ -d src ]] && ls src",
       "cat README.md || echo missing",
       "which node && echo present",
+      "cd src && rg -n TODO 2>/dev/null | head -n 20",
     ])("allows %j", (source) => {
       expect(isReadOnly(source)).toBe(true);
     });
@@ -152,19 +156,33 @@ describe("isReadOnly", () => {
   });
 
   describe("redirects", () => {
-    it.each(["grep TODO < README.md", "wc -l < package.json", "cat <<< 'hello'", "cat <<'EOF'\nhello\nEOF"])(
-      "allows read-only redirects %j",
-      (source) => {
-        expect(isReadOnly(source)).toBe(true);
-      },
-    );
+    it.each([
+      "grep TODO < README.md",
+      "wc -l < package.json",
+      "cat <<< 'hello'",
+      "cat <<'EOF'\nhello\nEOF",
+      "rg TODO src 2>/dev/null",
+      "cat file 2>&1",
+      "cat file 2>/dev/null | head",
+      "ls >/dev/null",
+      "ls >>/dev/null",
+      "cat foo &>/dev/null",
+      "cat foo &>>/dev/null",
+      "echo hi 1>&2",
+    ])("allows read-only redirects %j", (source) => {
+      expect(isReadOnly(source)).toBe(true);
+    });
 
-    it.each(["echo hi > out.txt", "echo hi >> out.txt", "cat file 2> err.log", "cat file &> combined.log"])(
-      "rejects write redirects %j",
-      (source) => {
-        expect(isReadOnly(source)).toBe(false);
-      },
-    );
+    it.each([
+      "echo hi > out.txt",
+      "echo hi >> out.txt",
+      "cat file 2> err.log",
+      "cat file &> combined.log",
+      "cat file &>> combined.log",
+      "cat file 2>&$fd",
+    ])("rejects write redirects %j", (source) => {
+      expect(isReadOnly(source)).toBe(false);
+    });
   });
 
   describe("background / expansion", () => {
@@ -174,16 +192,20 @@ describe("isReadOnly", () => {
       'echo "$USER"',
       "cat $(git rev-parse --show-toplevel)/README.md",
       "ls `pwd`",
-      "cat ~/.bashrc",
+      "cat ~user/.bashrc",
+      "ls ~+",
       "ls *.ts",
       "ls file?.txt",
     ])("rejects %j", (source) => {
       expect(isReadOnly(source)).toBe(false);
     });
 
-    it.each(["echo 'literal $HOME'", 'echo "plain text"'])("allows literal-only strings %j", (source) => {
-      expect(isReadOnly(source)).toBe(true);
-    });
+    it.each(["echo 'literal $HOME'", 'echo "plain text"', "cat ~/.bashrc", "ls ~", "cd ~/repos"])(
+      "allows literal-only strings %j",
+      (source) => {
+        expect(isReadOnly(source)).toBe(true);
+      },
+    );
   });
 
   describe("compound structures", () => {

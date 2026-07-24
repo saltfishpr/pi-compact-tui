@@ -11,6 +11,7 @@ import { validateTree } from "./tree";
 
 const READ_ONLY_COMMANDS = new Set([
   "cat",
+  "cd",
   "df",
   "du",
   "echo",

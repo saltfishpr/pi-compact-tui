@@ -63,8 +63,11 @@ function isReadOnlySimpleCommand(node: Command): boolean {
   );
 }
 
-// 只允许输入类重定向（<、<<<、<<、<<-）且目标必须是静态字面量，
-// 避免通过 >、>>、&> 等写入文件，或通过变量/展开引入不可预测的路径。
+// 允许的重定向：
+//   - 输入类：<、<<<、<<、<<-，目标必须是静态字面量；
+//   - 丢弃输出：>、>>、&>、&>>，目标必须是字面量 /dev/null；
+//   - fd 复制：>&、<&，目标必须是 fd 数字（如 2>&1、1>&2）。
+// 其余情况一律拒绝，避免通过写入文件或不可预测的路径引入副作用。
 function redirectsAreReadOnly(redirects: readonly Redirect[]): boolean {
   return redirects.every((redirect) => {
     if (!redirect.target || redirect.variableName) return false;
@@ -76,6 +79,14 @@ function redirectsAreReadOnly(redirects: readonly Redirect[]): boolean {
       case "<<":
       case "<<-":
         return isStaticWord(redirect.target) && isStaticHeredoc(redirect);
+      case ">":
+      case ">>":
+      case "&>":
+      case "&>>":
+        return isStaticWord(redirect.target) && redirect.target.value === "/dev/null";
+      case ">&":
+      case "<&":
+        return isStaticWord(redirect.target) && /^\d+$/.test(redirect.target.value);
       default:
         return false;
     }
@@ -146,8 +157,11 @@ function hasUnquotedExpansion(text: string): boolean {
   return hasUnquotedTilde(text) || !isStaticShellText(text, "word");
 }
 
+// 允许 `~` 单独出现或以 `~/` 开头（都展开为当前用户 $HOME，可预测）；
+// `~+`、`~-`、`~user`、`~user/...` 依赖 shell/系统状态，视为动态展开。
 function hasUnquotedTilde(text: string): boolean {
-  return text.startsWith("~");
+  if (!text.startsWith("~")) return false;
+  return text !== "~" && !text.startsWith("~/");
 }
 
 function isStaticPatternText(text: string): boolean {
