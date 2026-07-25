@@ -173,9 +173,9 @@ Project definitions require a trusted project. Name conflicts are resolved in th
 
 ### Bash Audit (`pi-bash-audit`)
 
-**Usage:** Disabled by default. After enabling it, read-only commands run directly; other `bash` tool calls are classified as `low`, `medium`, or `high` risk. Low- and medium-risk commands show notifications, while high-risk commands and audit failures require confirmation.
+**Usage:** Disabled by default. Run `/audit` to search the available models, select a supported thinking level, and enable auditing immediately. Read-only commands then run directly; other `bash` tool calls are classified as `low`, `medium`, or `high` risk. Low- and medium-risk commands show notifications, while high-risk commands and audit failures require confirmation.
 
-**Configuration:** Create `~/.pi/agent/extensions/bash-audit.json`:
+**Configuration:** `/audit` saves `~/.pi/agent/extensions/bash-audit.json`. To configure it manually, create the file with:
 
 ```json
 {

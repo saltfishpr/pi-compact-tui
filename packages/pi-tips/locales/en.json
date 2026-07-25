@@ -13,5 +13,5 @@
   "tip.trustGit": "Configure ~/.pi/agent/extensions/trust.json to auto-trust projects by Git origin.",
   "tip.footer": "Customize the footer layout by editing ~/.pi/agent/extensions/footer.json.",
   "tip.subagent": "Ask Pi to \"use the planner subagent\" to draft a plan grounded in the codebase.",
-  "tip.bashAudit": "Configure ~/.pi/agent/extensions/bash-audit.json to enable LLM-powered bash command auditing."
+  "tip.bashAudit": "Run /audit to choose a model and enable LLM-powered bash command auditing."
 }

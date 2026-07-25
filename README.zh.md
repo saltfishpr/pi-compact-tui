@@ -173,9 +173,9 @@ effort: high
 
 ### Bash 审计（`pi-bash-audit`）
 
-**使用方法：** 默认关闭。启用后，只读命令会直接执行；其他 `bash` 工具调用会被判定为 `low`、`medium` 或 `high` 风险。低、中风险仅展示通知，高风险和审计失败会要求确认。
+**使用方法：** 默认关闭。运行 `/audit`，搜索可用模型并选择该模型支持的推理档位，即可立即启用审计。启用后，只读命令会直接执行；其他 `bash` 工具调用会被判定为 `low`、`medium` 或 `high` 风险。低、中风险仅展示通知，高风险和审计失败会要求确认。
 
-**配置：** 创建 `~/.pi/agent/extensions/bash-audit.json`：
+**配置：** `/audit` 会保存 `~/.pi/agent/extensions/bash-audit.json`。如需手工配置，创建该文件并写入：
 
 ```json
 {

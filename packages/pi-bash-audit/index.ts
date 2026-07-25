@@ -1,10 +1,11 @@
-import type { Api, Model, ModelThinkingLevel } from "@earendil-works/pi-ai";
-import { type ExtensionAPI, isToolCallEventType } from "@earendil-works/pi-coding-agent";
+import { getSupportedThinkingLevels, type Api, type Model, type ModelThinkingLevel } from "@earendil-works/pi-ai";
+import { isToolCallEventType, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Container, Text } from "@earendil-works/pi-tui";
 
 import { createLogger, resolveModel } from "../pi-common";
 import { auditCommand } from "./auditor";
-import { loadConfig } from "./config";
+import { loadConfig, saveConfig, type BashAuditConfig } from "./config";
+import { selectAuditModel, selectAuditThinkingLevel } from "./selector";
 import { isReadOnly } from "./shell";
 
 const logger = createLogger("pi-bash-audit");
@@ -28,6 +29,61 @@ export default function (pi: ExtensionAPI) {
     return new Text(theme.fg(color, `[bash-audit] ${data.message}`), 0, 0);
   });
 
+  pi.registerCommand("audit", {
+    description: "Configure and enable bash command auditing",
+    handler: async (_args, ctx) => {
+      if (ctx.mode !== "tui") {
+        const message = "/audit is only available in TUI mode";
+        if (ctx.hasUI) ctx.ui.notify(message, "warning");
+        else console.error(message);
+        return;
+      }
+
+      const models = ctx.modelRegistry.getAvailable();
+      if (models.length === 0) {
+        ctx.ui.notify("[bash-audit] no available models", "warning");
+        return;
+      }
+
+      let previousConfig: BashAuditConfig | undefined;
+      try {
+        previousConfig = loadConfig();
+      } catch {
+        // A complete selection will replace malformed configuration.
+      }
+
+      const previousModel = previousConfig?.model
+        ? models.find((model) => `${model.provider}/${model.id}` === previousConfig?.model)
+        : undefined;
+      const selectedModel = await selectAuditModel(ctx, models, previousModel);
+      if (!selectedModel) return;
+
+      const modelId = `${selectedModel.provider}/${selectedModel.id}`;
+      const availableLevels = getSupportedThinkingLevels(selectedModel);
+      const configuredLevel = previousConfig?.model === modelId ? (previousConfig.thinkingLevel ?? "off") : "off";
+      const initialLevel = availableLevels.includes(configuredLevel) ? configuredLevel : "off";
+      const selectedLevel = await selectAuditThinkingLevel(ctx, initialLevel, availableLevels);
+      if (!selectedLevel) return;
+
+      const config = {
+        enable: true,
+        model: modelId,
+        thinkingLevel: selectedLevel,
+      } satisfies BashAuditConfig;
+      try {
+        saveConfig(config);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        ctx.ui.notify(`[bash-audit] failed to save configuration: ${message}`, "error");
+        return;
+      }
+
+      resolvedModel = selectedModel;
+      thinkingLevel = selectedLevel;
+      ctx.ui.notify(`[bash-audit] enabled with ${modelId} (${selectedLevel})`, "info");
+    },
+  });
+
   pi.on("session_start", async (_event, ctx) => {
     const config = loadConfig();
     if (!config.enable) return;
@@ -40,7 +96,7 @@ export default function (pi: ExtensionAPI) {
       if (config.model) {
         ctx.ui.notify(`[bash-audit] model "${config.model}" not found, bash-audit disabled`, "warning");
       } else {
-        ctx.ui.notify(`[bash-audit] no model configured, bash-audit disabled`, "warning");
+        ctx.ui.notify(`[bash-audit] no model configured, run "/audit" to select one`);
       }
       return;
     }
