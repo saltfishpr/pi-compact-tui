@@ -19,9 +19,11 @@ const ZERO_COST = {
 
 const OPENAI_COMPAT = {
   supportsDeveloperRole: false,
-  supportsReasoningEffort: false,
+  supportsReasoningEffort: true,
   supportsUsageInStreaming: false,
   maxTokensField: "max_tokens" as const,
+  // Ark uses the same shape as DeepSeek: top-level `thinking: { type }` plus `reasoning_effort`.
+  thinkingFormat: "deepseek" as const,
 };
 
 const arkModelSchema = z.object({
@@ -72,8 +74,16 @@ function toPiModel(model: ArkModel): Model<"openai-completions"> {
     api: "openai-completions",
     provider: PROVIDER_ID,
     baseUrl: BASE_URL,
-    // Ark routes multiple model families with different reasoning controls.
-    reasoning: false,
+    reasoning: true,
+    thinkingLevelMap: {
+      off: "none",
+      minimal: "minimal",
+      low: "low",
+      medium: "medium",
+      high: "high",
+      xhigh: "xhigh",
+      max: "max",
+    },
     input,
     cost: ZERO_COST,
     contextWindow: model.token_limits?.context_window ?? DEFAULT_CONTEXT_WINDOW,
