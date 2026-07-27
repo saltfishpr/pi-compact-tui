@@ -61,11 +61,12 @@ export async function auditCommand(options: AuditCommandOptions): Promise<AuditR
       maxTokens: MAX_TOKENS,
       signal: controller.signal,
       onPayload(payload, requestModel) {
+        if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
+          return undefined;
+        }
+
         switch (requestModel.provider) {
           case "deepseek":
-            if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
-              return undefined;
-            }
             return { ...payload, response_format: { type: "json_object" } };
           default:
             return undefined;
@@ -92,12 +93,25 @@ export async function auditCommand(options: AuditCommandOptions): Promise<AuditR
       streamOptions,
     );
 
+    if (response.stopReason === "aborted") {
+      if (timedOut.value) return { kind: "failed", reason: "audit timed out" };
+      return { kind: "aborted" };
+    }
+    if (response.stopReason === "error") {
+      return { kind: "failed", reason: response.errorMessage ?? "audit request failed" };
+    }
+
     const text = response.content
       .filter((block) => block.type === "text")
       .map((block) => block.text)
       .join("")
       .trim();
-    if (!text) return { kind: "failed", reason: "empty response" };
+    if (!text) {
+      // stopReason=length 时通常是 max_tokens 打满
+      const reason =
+        response.stopReason === "length" ? `empty response (truncated at max_tokens=${MAX_TOKENS})` : "empty response";
+      return { kind: "failed", reason };
+    }
 
     let parsed: { risk?: unknown; reason?: unknown };
     try {
@@ -118,7 +132,7 @@ export async function auditCommand(options: AuditCommandOptions): Promise<AuditR
   } catch (error) {
     // 超时或外部 abort 都会体现在 controller.signal.aborted 上，区分后再回报。
     if (controller.signal.aborted) {
-      return timedOut.value ? { kind: "failed", reason: "audit timed out after 10s" } : { kind: "aborted" };
+      return timedOut.value ? { kind: "failed", reason: "audit timed out" } : { kind: "aborted" };
     }
     const message = error instanceof Error ? error.message : String(error);
     return { kind: "failed", reason: message };
