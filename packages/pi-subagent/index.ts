@@ -43,15 +43,21 @@ function registerAgentTool(
   let nextAgentNumber = initialAgentNumber;
   const description = [
     "Delegate a focused task to a specialized subagent that runs in an isolated context.",
-    "The subagent does not see this conversation, so put everything it needs in `prompt`.",
+    "The subagent does not see this conversation, so include every piece of context it needs in `prompt`.",
+    "",
     "Available subagents:",
-    ...agents.map((agent) => `- ${agent.name}: ${agent.description}`),
+    ...agents.map((agent) => `\n  - ${agent.name}: ${agent.description}`),
   ].join("\n");
 
   pi.registerTool({
     name: "agent",
     label: "Agent",
     description,
+    promptSnippet: "Delegate a focused task to a specialized subagent that runs in an isolated context",
+    promptGuidelines: [
+      "Use agent to delegate self-contained tasks to a specialized subagent; the subagent does not see the current conversation, so put every needed detail into `prompt`.",
+      "Use agent when a task matches one of the listed subagents and benefits from an isolated context (e.g. broad research, parallelizable subtasks) — avoid it for trivial lookups you can handle directly.",
+    ],
     parameters: Type.Object({
       name: StringEnum(
         agents.map((agent) => agent.name),
