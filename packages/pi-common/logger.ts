@@ -32,7 +32,8 @@ function getOrCreateWinstonLogger(name: string, options: CreateLoggerOptions): w
   mkdirSync(logsDir, { recursive: true });
 
   const transport = new DailyRotateFile({
-    filename: join(logsDir, `${name}-%DATE%.log`),
+    dirname: logsDir,
+    filename: `${name}-%DATE%.log`,
     datePattern: options.datePattern ?? "YYYY-MM-DD",
     zippedArchive: options.zippedArchive ?? true,
     maxSize: options.maxSize ?? "20m",
