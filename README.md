@@ -2,6 +2,8 @@
 
 A collection of [Pi](https://pi.dev/) extensions for everyday use. It streamlines the TUI, adds useful status information, and provides input history, a shortcut for starting new sessions, and an additional model provider.
 
+![Demo](./assets/demo.gif)
+
 ## Installation
 
 ### npm
@@ -154,6 +156,8 @@ Review the requested changes and report concrete problems with file references.
 Project definitions require a trusted project. Name conflicts are resolved in this order: project, global, bundled.
 
 ### Idle Recap (`pi-recap`)
+
+![Recap](./assets/recap.png)
 
 **Usage:** After the agent finishes, the extension generates a short recap when the session remains idle for 5 minutes. Run `/recap` to trigger it immediately.
 

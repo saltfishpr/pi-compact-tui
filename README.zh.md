@@ -2,6 +2,8 @@
 
 一组面向日常使用的 [Pi](https://pi.dev/) 扩展：精简 TUI、补充常用状态，并提供输入历史、新会话快捷命令和额外模型 provider。
 
+![Demo](./assets/demo.gif)
+
 ## 安装
 
 ### npm
@@ -154,6 +156,8 @@ effort: high
 项目级定义仅在项目受信任时加载。同名定义的优先级为：项目级、全局、内置。
 
 ### 空闲回顾（`pi-recap`）
+
+![Recap](./assets/recap.png)
 
 **使用方法：** Agent 完成工作后，如果会话保持空闲 5 分钟，插件会生成简短摘要。执行 `/recap` 可立即触发。
 
