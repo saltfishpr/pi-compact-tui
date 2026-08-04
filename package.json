@@ -29,7 +29,8 @@
       "./packages/pi-subagent/index.ts",
       "./packages/pi-tips/index.ts",
       "./packages/pi-trust-git/index.ts"
-    ]
+    ],
+    "image": "https://github.com/saltfishpr/pi-compact-tui/blob/master/assets/recap.png"
   },
   "scripts": {
     "test": "vitest run",
