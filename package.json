@@ -15,6 +15,12 @@
   "bugs": {
     "url": "https://github.com/saltfishpr/pi-compact-tui/issues"
   },
+  "files": [
+    "packages",
+    "README.md",
+    "README.zh.md",
+    "LICENSE"
+  ],
   "pi": {
     "extensions": [
       "./packages/pi-bash-audit/index.ts",
@@ -30,7 +36,7 @@
       "./packages/pi-tips/index.ts",
       "./packages/pi-trust-git/index.ts"
     ],
-    "image": "https://github.com/saltfishpr/pi-compact-tui/blob/master/assets/recap.png"
+    "image": "https://raw.githubusercontent.com/saltfishpr/pi-compact-tui/refs/heads/master/assets/recap.png"
   },
   "scripts": {
     "test": "vitest run",
