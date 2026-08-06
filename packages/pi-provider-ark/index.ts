@@ -8,7 +8,6 @@ const PROVIDER_NAME = "Ark Coding Plan";
 const BASE_URL = "https://ark.cn-beijing.volces.com/api/coding/v3";
 const DEFAULT_CONTEXT_WINDOW = 128_000;
 const DEFAULT_MAX_TOKENS = 16_384;
-const MODELS_FRESHNESS_MS = 4 * 60 * 60 * 1000; // 4 小时
 
 const ZERO_COST = {
   input: 0,
@@ -119,17 +118,9 @@ export default function registerArkProvider(pi: ExtensionAPI): void {
         },
       },
       models: [],
-      async fetchModels({ credential, store, force, signal }) {
+      async fetchModels({ credential, signal }) {
         if (credential?.type !== "api_key" || !credential.key) {
           return [];
-        }
-
-        // 检查缓存新鲜度，未过期则直接返回缓存
-        if (!force) {
-          const cached = await store.read();
-          if (cached?.checkedAt && Date.now() - cached.checkedAt < MODELS_FRESHNESS_MS) {
-            return cached.models.filter((model) => model.provider === PROVIDER_ID);
-          }
         }
 
         const response = await fetch(`${BASE_URL}/models`, {
