@@ -99,12 +99,31 @@ README（`README.md` / `README.zh.md`）面向插件使用者，不是开发者�
 
 ## 参考文档
 
-Pi 类型声明及完整 API 文档位于:
+优先阅读以下 pi-coding-agent 文档；它们与本仓库的 extension 开发直接相关：
 
-- `node_modules/@earendil-works/pi-coding-agent/docs/extensions.md`
-- `@earendil-works/pi-coding-agent`
-  - `node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/interactive-mode.js`
-- `@earendil-works/pi-tui`
-  - `node_modules/@earendil-works/pi-tui`
-- `@earendil-works/pi-ai`
-  - `node_modules/@earendil-works/pi-ai`
+- `node_modules/@earendil-works/pi-coding-agent/docs/extensions.md` — Extension API、事件生命周期、命令、工具、状态管理与自定义 UI 的主参考。
+- `node_modules/@earendil-works/pi-coding-agent/docs/tui.md` — `@earendil-works/pi-tui` 组件、自定义编辑器和 footer 的实现模式。
+- `node_modules/@earendil-works/pi-coding-agent/docs/custom-provider.md` — 自定义 provider、模型定义与认证；修改 `pi-provider-ark` 时阅读。
+- `node_modules/@earendil-works/pi-coding-agent/docs/session-format.md` — session 条目格式与 `SessionManager`；修改历史、recap 或 subagent 的持久化逻辑时阅读。
+- `node_modules/@earendil-works/pi-coding-agent/docs/packages.md` — pi package 的扩展入口和运行时依赖约定。
+
+需要核对实现或未公开的行为时，查看已安装版本的运行时代码与类型声明：
+
+- `node_modules/@earendil-works/pi-coding-agent/dist/index.d.ts` — 公开导出的类型与函数。
+- `node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/{types,loader,runner}.{d.ts,js}` — 扩展类型、加载和事件执行流程。
+- `node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/interactive-mode.{d.ts,js}` — 交互 TUI 模式的集成行为。
+- `node_modules/@earendil-works/pi-coding-agent/dist/core/session-manager.{d.ts,js}` — 会话状态与分支恢复实现。
+
+## Agent skills
+
+### Issue tracker
+
+议题和规格存放于仓库内的本地 Markdown 文件。详见 `docs/agents/issue-tracker.md`。
+
+### Triage labels
+
+使用默认的五个分诊标签。详见 `docs/agents/triage-labels.md`。
+
+### Domain docs
+
+采用多上下文布局。详见 `docs/agents/domain.md`。
