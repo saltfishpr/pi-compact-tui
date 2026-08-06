@@ -42,39 +42,48 @@ function formatCwdForFooter(cwd: string, home: string | undefined): string {
   return ["~", ...directorySegments, segments.at(-1)].join(sep);
 }
 
-interface TokenStats {
+interface UsageTotals {
   input: number;
   output: number;
   cacheRead: number;
   cacheWrite: number;
   cost: number;
+}
+
+function createUsageTotals(): UsageTotals {
+  return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 };
+}
+
+function addUsageToTotals(
+  totals: UsageTotals,
+  usage: { input: number; output: number; cacheRead: number; cacheWrite: number; cost: { total: number } },
+): void {
+  totals.input += usage.input;
+  totals.output += usage.output;
+  totals.cacheRead += usage.cacheRead;
+  totals.cacheWrite += usage.cacheWrite;
+  totals.cost += usage.cost.total;
+}
+
+interface TokenStats extends UsageTotals {
   latestCacheHitRate: number | undefined;
 }
 
 function collectTokenStats(ctx: ExtensionContext): TokenStats {
-  let input = 0;
-  let output = 0;
-  let cacheRead = 0;
-  let cacheWrite = 0;
-  let cost = 0;
+  const usageTotals = createUsageTotals();
   let latestCacheHitRate: number | undefined;
   for (const entry of ctx.sessionManager.getEntries()) {
-    if (entry.type !== "message") continue;
-    if (entry.message.role !== "assistant") continue;
-    const usage = entry.message.usage;
-    input += usage.input;
-    output += usage.output;
-    cacheRead += usage.cacheRead;
-    cacheWrite += usage.cacheWrite;
-    cost += usage.cost.total;
-    const promptTokens = usage.input + usage.cacheRead + usage.cacheWrite;
-    latestCacheHitRate = promptTokens > 0 ? (usage.cacheRead / promptTokens) * 100 : undefined;
+    if (entry.type === "message" && entry.message.role === "assistant") {
+      addUsageToTotals(usageTotals, entry.message.usage);
+      const promptTokens = entry.message.usage.input + entry.message.usage.cacheRead + entry.message.usage.cacheWrite;
+      latestCacheHitRate = promptTokens > 0 ? (entry.message.usage.cacheRead / promptTokens) * 100 : undefined;
+    } else if (entry.type === "message" && entry.message.role === "toolResult" && entry.message.usage) {
+      addUsageToTotals(usageTotals, entry.message.usage);
+    } else if ((entry.type === "branch_summary" || entry.type === "compaction") && entry.usage) {
+      addUsageToTotals(usageTotals, entry.usage);
+    }
   }
-  return { input, output, cacheRead, cacheWrite, cost, latestCacheHitRate };
-}
-
-function dim(theme: Theme, text: string): string {
-  return theme.fg("dim", text);
+  return { ...usageTotals, latestCacheHitRate };
 }
 
 class ConfigurableFooter implements Component {
@@ -114,6 +123,10 @@ class ConfigurableFooter implements Component {
 
   invalidate(): void {}
 
+  dispose(): void {
+    // Git watcher cleanup handled by provider
+  }
+
   private buildAll(extensionStatuses: ReadonlyMap<string, string>): Record<string, string> {
     const stats = collectTokenStats(this.ctx);
     const state = this.ctx;
@@ -137,9 +150,11 @@ class ConfigurableFooter implements Component {
     let contextStr: string;
     if (contextPercentValue > 90) contextStr = theme.fg("error", contextDisplay);
     else if (contextPercentValue > 70) contextStr = theme.fg("warning", contextDisplay);
-    else contextStr = dim(theme, contextDisplay);
+    else contextStr = theme.fg("dim", contextDisplay);
 
-    const usingSubscription = state.model ? state.modelRegistry.isUsingOAuth(state.model) : false;
+    const usingSubscription = state.model
+      ? state.model.provider === "kimi-coding" || state.modelRegistry.isUsingOAuth(state.model)
+      : false;
     const costStr =
       stats.cost || usingSubscription ? `$${stats.cost.toFixed(3)}${usingSubscription ? " (sub)" : ""}` : "";
 
@@ -162,22 +177,22 @@ class ConfigurableFooter implements Component {
     }
 
     return {
-      pwd: dim(theme, pwd),
-      branch: branch ? dim(theme, `(${branch})`) : "",
-      sessionName: sessionName ? dim(theme, `• ${sessionName}`) : "",
-      inputTokens: stats.input ? dim(theme, `↑${formatTokens(stats.input)}`) : "",
-      outputTokens: stats.output ? dim(theme, `↓${formatTokens(stats.output)}`) : "",
-      cacheReadTokens: stats.cacheRead ? dim(theme, `R${formatTokens(stats.cacheRead)}`) : "",
-      cacheWriteTokens: stats.cacheWrite ? dim(theme, `W${formatTokens(stats.cacheWrite)}`) : "",
+      pwd: theme.fg("dim", pwd),
+      branch: branch ? theme.fg("dim", `(${branch})`) : "",
+      sessionName: sessionName ? theme.fg("dim", `• ${sessionName}`) : "",
+      inputTokens: stats.input ? theme.fg("dim", `↑${formatTokens(stats.input)}`) : "",
+      outputTokens: stats.output ? theme.fg("dim", `↓${formatTokens(stats.output)}`) : "",
+      cacheReadTokens: stats.cacheRead ? theme.fg("dim", `R${formatTokens(stats.cacheRead)}`) : "",
+      cacheWriteTokens: stats.cacheWrite ? theme.fg("dim", `W${formatTokens(stats.cacheWrite)}`) : "",
       cacheHitRate:
         (stats.cacheRead > 0 || stats.cacheWrite > 0) && stats.latestCacheHitRate !== undefined
-          ? dim(theme, `CH${stats.latestCacheHitRate.toFixed(1)}%`)
+          ? theme.fg("dim", `CH${stats.latestCacheHitRate.toFixed(1)}%`)
           : "",
-      cost: costStr ? dim(theme, costStr) : "",
+      cost: costStr ? theme.fg("dim", costStr) : "",
       context: contextStr,
-      provider: providerStr ? dim(theme, providerStr) : "",
-      model: modelStr ? dim(theme, modelStr) : "",
-      thinkingLevel: thinkingLevelText ? dim(theme, thinkingLevelText) : "",
+      provider: providerStr ? theme.fg("dim", providerStr) : "",
+      model: modelStr ? theme.fg("dim", modelStr) : "",
+      thinkingLevel: thinkingLevelText ? theme.fg("dim", thinkingLevelText) : "",
       extensionStatuses: statusText,
     };
   }
@@ -210,7 +225,7 @@ class ConfigurableFooter implements Component {
     const leftWidth = visibleWidth(left);
     const rightWidth = visibleWidth(right);
     if (!right) {
-      return truncateToWidth(left, width, dim(this.theme, "..."));
+      return truncateToWidth(left, width, this.theme.fg("dim", "..."));
     }
     if (!left) {
       if (rightWidth >= width) return truncateToWidth(right, width, "");
@@ -226,7 +241,7 @@ class ConfigurableFooter implements Component {
       const truncatedRightWidth = visibleWidth(truncatedRight);
       return left + " ".repeat(Math.max(0, width - leftWidth - truncatedRightWidth)) + truncatedRight;
     }
-    return truncateToWidth(left, width, dim(this.theme, "..."));
+    return truncateToWidth(left, width, this.theme.fg("dim", "..."));
   }
 }
 
