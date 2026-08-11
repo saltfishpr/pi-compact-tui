@@ -91,7 +91,7 @@ function toPiModel(model: ArkModel): Model<"openai-completions"> {
   };
 }
 
-export default function registerArkProvider(pi: ExtensionAPI): void {
+export default function (pi: ExtensionAPI): void {
   pi.registerProvider(
     createProvider({
       id: PROVIDER_ID,
