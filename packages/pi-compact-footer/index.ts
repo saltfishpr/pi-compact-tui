@@ -7,6 +7,7 @@ import type {
 import type { Component, TUI } from "@earendil-works/pi-tui";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { isAbsolute, relative, resolve, sep } from "node:path";
+import { addUsageToTotals, createUsageTotals, type UsageTotals } from "../pi-common";
 import { type FooterConfig, getStatusKey, loadConfig } from "./config";
 
 function sanitizeStatusText(text: string): string {
@@ -40,29 +41,6 @@ function formatCwdForFooter(cwd: string, home: string | undefined): string {
     .slice(0, -1)
     .map((segment) => (segment.startsWith(".") ? segment.slice(0, 2) : segment.slice(0, 1)));
   return ["~", ...directorySegments, segments.at(-1)].join(sep);
-}
-
-interface UsageTotals {
-  input: number;
-  output: number;
-  cacheRead: number;
-  cacheWrite: number;
-  cost: number;
-}
-
-function createUsageTotals(): UsageTotals {
-  return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0 };
-}
-
-function addUsageToTotals(
-  totals: UsageTotals,
-  usage: { input: number; output: number; cacheRead: number; cacheWrite: number; cost: { total: number } },
-): void {
-  totals.input += usage.input;
-  totals.output += usage.output;
-  totals.cacheRead += usage.cacheRead;
-  totals.cacheWrite += usage.cacheWrite;
-  totals.cost += usage.cost.total;
 }
 
 interface TokenStats extends UsageTotals {
