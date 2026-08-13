@@ -4,6 +4,7 @@ import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-
 import { addUsageToTotals, createUsageTotals, type UsageTotals } from "../pi-common";
 import type { AgentProfile } from "./agents";
 import { createChildSession } from "./child-session";
+import { logger } from "./logger";
 
 export type SpawnStopReason = "stop" | "aborted" | "max_turns";
 
@@ -146,9 +147,13 @@ class AgentThread {
       await session.bindExtensions({
         mode: "print",
         onError: (error) => {
-          process.stderr.write(
-            `[pi-subagent] extension error (${error.extensionPath}) ${error.event}: ${error.error}\n`,
-          );
+          logger.error("Extension error", {
+            toolCallId: this.id,
+            extensionPath: error.extensionPath,
+            event: error.event,
+            error: error.error,
+            stack: error.stack,
+          });
         },
       });
 

@@ -9,6 +9,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 
 import type { AgentProfile } from "./agents";
+import { logger } from "./logger";
 import { getCompactExtensionLabel } from "./vendor/extension-label";
 
 /** pi 默认 builtin 工具白名单（profile.tools 缺省时启用）。 */
@@ -56,6 +57,16 @@ export async function createChildSession(options: CreateChildSessionOptions): Pr
 
   const extensionToolNames = loader.getExtensions().extensions.flatMap((extension) => [...extension.tools.keys()]);
   const tools = [...new Set([...(profile.tools ?? DEFAULT_TOOLS), ...extensionToolNames])];
+
+  logger.info("createChildSession", {
+    cwd,
+    tools,
+    skills: loader.getSkills().skills.map((skill) => skill.name),
+    extensions: loader.getExtensions().extensions.map((extension) => ({
+      resolvedPath: extension.resolvedPath,
+      sourceInfo: extension.sourceInfo,
+    })),
+  });
 
   const { session } = await createAgentSession({
     cwd,

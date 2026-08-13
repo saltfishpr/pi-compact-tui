@@ -1,4 +1,4 @@
-import { StringEnum, Type, type TextContent } from "@earendil-works/pi-ai";
+import { Type, type TextContent } from "@earendil-works/pi-ai";
 import {
   AgentToolResult,
   ExtensionAPI,
