@@ -15,8 +15,8 @@
 import * as os from "node:os";
 import * as path from "node:path";
 
+import { Extension, SourceInfo } from "@earendil-works/pi-coding-agent";
 import { parseGitUrl } from "./git";
-import { SourceInfo } from "@earendil-works/pi-coding-agent";
 
 function formatDisplayPath(p: string): string {
   const home = os.homedir();
@@ -78,6 +78,39 @@ function getCompactPathLabel(resourcePath: string, sourceInfo?: SourceInfo): str
   return shortPath;
 }
 
+function getCompactDisplayPathSegments(resourcePath: string): string[] {
+  return formatDisplayPath(resourcePath)
+    .replace(/\\/g, "/")
+    .split("/")
+    .filter((segment) => segment.length > 0 && segment !== "~");
+}
+
+function getCompactNonPackageExtensionLabel(
+  resourcePath: string,
+  index: number,
+  allPaths: Array<{ path: string; segments: string[] }>,
+): string {
+  const segments = allPaths[index]?.segments;
+  if (!segments || segments.length === 0) {
+    return getCompactPathLabel(resourcePath);
+  }
+
+  for (let segmentCount = 1; segmentCount <= segments.length; segmentCount += 1) {
+    const candidate = segments.slice(-segmentCount).join("/");
+    const isUnique = allPaths.every((item, itemIndex) => {
+      if (itemIndex === index) {
+        return true;
+      }
+      return item.segments.slice(-segmentCount).join("/") !== candidate;
+    });
+    if (isUnique) {
+      return candidate;
+    }
+  }
+
+  return segments.join("/");
+}
+
 function getCompactPackageSourceLabel(sourceInfo?: SourceInfo): string {
   const source = sourceInfo?.source ?? "";
   if (source.startsWith("npm:")) {
@@ -92,7 +125,7 @@ function getCompactPackageSourceLabel(sourceInfo?: SourceInfo): string {
   return source;
 }
 
-export function getCompactExtensionLabel(resourcePath: string, sourceInfo?: SourceInfo): string {
+function getCompactExtensionLabel(resourcePath: string, sourceInfo?: SourceInfo): string {
   if (!isPackageSource(sourceInfo)) {
     return getCompactPathLabel(resourcePath, sourceInfo);
   }
@@ -116,4 +149,32 @@ export function getCompactExtensionLabel(resourcePath: string, sourceInfo?: Sour
 function isPackageSource(sourceInfo?: SourceInfo): boolean {
   const source = sourceInfo?.source ?? "";
   return source.startsWith("npm:") || source.startsWith("git:");
+}
+
+export function getCompactExtensionLabelAdapter(extensions: readonly Extension[], extension: Extension): string {
+  const nonPackageExtensions = extensions
+    .map((extension) => {
+      const segments = getCompactDisplayPathSegments(extension.path);
+      const lastSegment = segments[segments.length - 1];
+      if (segments.length > 1 && (lastSegment === "index.ts" || lastSegment === "index.js")) {
+        segments.pop();
+      }
+      return {
+        path: extension.path,
+        sourceInfo: extension.sourceInfo,
+        segments,
+      };
+    })
+    .filter((extension) => !isPackageSource(extension.sourceInfo));
+
+  if (isPackageSource(extension.sourceInfo)) {
+    return getCompactExtensionLabel(extension.path, extension.sourceInfo);
+  }
+
+  const nonPackageIndex = nonPackageExtensions.findIndex((item) => item.path === extension.path);
+  if (nonPackageIndex === -1) {
+    return getCompactPathLabel(extension.path, extension.sourceInfo);
+  }
+
+  return getCompactNonPackageExtensionLabel(extension.path, nonPackageIndex, nonPackageExtensions);
 }

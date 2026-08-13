@@ -1,32 +1,19 @@
 import type { Model, ModelThinkingLevel } from "@earendil-works/pi-ai";
 import {
+  AgentSession,
   createAgentSession,
   DefaultResourceLoader,
+  Extension,
   getAgentDir,
   SessionManager,
-  type AgentSession,
-  type Extension,
 } from "@earendil-works/pi-coding-agent";
 
 import type { AgentProfile } from "./agents";
 import { logger } from "./logger";
-import { getCompactExtensionLabel } from "./vendor/extension-label";
+import { getCompactExtensionLabelAdapter } from "./vendor/extension-label";
 
 /** pi 默认 builtin 工具白名单（profile.tools 缺省时启用）。 */
 const DEFAULT_TOOLS = ["read", "bash", "edit", "write"];
-
-/**
- * 按 profile 白名单过滤扩展，返回是否命中。
- */
-function matchesExtension(extension: Extension, whitelist: ReadonlySet<string>): boolean {
-  const candidates = [
-    extension.resolvedPath,
-    extension.sourceInfo.path,
-    extension.sourceInfo.source,
-    getCompactExtensionLabel(extension.resolvedPath, extension.sourceInfo),
-  ];
-  return candidates.some((candidate) => whitelist.has(candidate));
-}
 
 export interface CreateChildSessionOptions {
   cwd: string;
@@ -37,20 +24,37 @@ export interface CreateChildSessionOptions {
 
 export async function createChildSession(options: CreateChildSessionOptions): Promise<AgentSession> {
   const { cwd, profile, model, thinkingLevel } = options;
+
   const skillWhitelist = new Set(profile.skills ?? []);
   const extensionWhitelist = new Set(profile.extensions ?? []);
+  let availableSkills: string[] = [];
+  let availableExtensions: Extension[] = [];
 
   const loader = new DefaultResourceLoader({
     cwd,
     agentDir: getAgentDir(),
-    skillsOverride: (base) => ({
-      ...base,
-      skills: base.skills.filter((skill) => skillWhitelist.has(skill.name)),
-    }),
-    extensionsOverride: (base) => ({
-      ...base,
-      extensions: base.extensions.filter((extension) => matchesExtension(extension, extensionWhitelist)),
-    }),
+    skillsOverride: (base) => {
+      availableSkills = base.skills.map((skill) => skill.name);
+      return {
+        ...base,
+        skills: base.skills.filter((skill) => skillWhitelist.has(skill.name)),
+      };
+    },
+    extensionsOverride: (base) => {
+      availableExtensions = base.extensions;
+      return {
+        ...base,
+        extensions: base.extensions.filter((extension) => {
+          const candidates = [
+            extension.resolvedPath,
+            extension.sourceInfo.path,
+            extension.sourceInfo.source,
+            getCompactExtensionLabelAdapter(base.extensions, extension),
+          ];
+          return candidates.some((candidate) => extensionWhitelist.has(candidate));
+        }),
+      };
+    },
     appendSystemPromptOverride: (base) => (profile.body.trim() ? [...base, profile.body] : base),
   });
   await loader.reload();
@@ -58,11 +62,18 @@ export async function createChildSession(options: CreateChildSessionOptions): Pr
   const extensionToolNames = loader.getExtensions().extensions.flatMap((extension) => [...extension.tools.keys()]);
   const tools = [...new Set([...(profile.tools ?? DEFAULT_TOOLS), ...extensionToolNames])];
 
-  logger.info("createChildSession", {
+  logger.debug("createChildSession", {
     cwd,
     tools,
+    availableSkills,
+    availableExtensions: availableExtensions.map((extension) => ({
+      path: extension.path,
+      resolvedPath: extension.resolvedPath,
+      sourceInfo: extension.sourceInfo,
+    })),
     skills: loader.getSkills().skills.map((skill) => skill.name),
     extensions: loader.getExtensions().extensions.map((extension) => ({
+      path: extension.path,
       resolvedPath: extension.resolvedPath,
       sourceInfo: extension.sourceInfo,
     })),

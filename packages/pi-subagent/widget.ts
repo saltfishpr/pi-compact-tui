@@ -31,20 +31,6 @@ function formatToolCall(theme: Theme, name: string, args: Record<string, unknown
       if (lines > 1) text += theme.fg("muted", ` (${lines} lines)`);
       return text;
     }
-    case "grep": {
-      const pattern = (args.pattern || "") as string;
-      const path = (args.path || ".") as string;
-      return theme.fg("accent", `grep /${pattern}/`) + theme.fg("muted", ` in ${shortenPath(path)}`);
-    }
-    case "find": {
-      const pattern = (args.pattern || "*") as string;
-      const path = (args.path || ".") as string;
-      return theme.fg("accent", `find ${pattern}`) + theme.fg("muted", ` in ${shortenPath(path)}`);
-    }
-    case "ls": {
-      const path = (args.path || ".") as string;
-      return theme.fg("accent", `${name} `) + theme.fg("muted", shortenPath(path));
-    }
     default: {
       const serialized = JSON.stringify(args);
       const preview = serialized.length > 50 ? `${serialized.slice(0, 50)}...` : serialized;
