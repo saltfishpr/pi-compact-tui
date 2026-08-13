@@ -13,16 +13,17 @@ const frontmatterSchema = z.object({
   description: z.string().min(1),
   tools: z.array(z.string().min(1)).optional(),
   skills: z.array(z.string().min(1)).optional(),
+  extensions: z.array(z.string().min(1)).optional(),
   model: modelSchema.shape.model,
   effort: z.enum(THINKING_LEVELS).optional(),
-  maxTurns: z.number().int().positive().optional(),
+  maxTurns: z.number().int().positive().default(50),
 });
 
 type AgentFrontmatter = z.infer<typeof frontmatterSchema>;
 
 export type AgentSource = "builtin" | "global" | "project";
 
-export interface LoadedAgent extends AgentFrontmatter {
+export interface AgentProfile extends AgentFrontmatter {
   name: string;
   source: AgentSource;
   body: string;
@@ -34,7 +35,7 @@ export interface AgentDiagnostic {
 }
 
 export interface AgentCatalog {
-  agents: LoadedAgent[];
+  agents: AgentProfile[];
   diagnostics: AgentDiagnostic[];
 }
 
@@ -54,14 +55,16 @@ function formatValidationError(error: z.ZodError): string {
 function loadAgentsFromDir(
   dir: string,
   source: AgentSource,
-  agents: Map<string, LoadedAgent>,
+  agents: Map<string, AgentProfile>,
   diagnostics: AgentDiagnostic[],
 ): void {
   if (!existsSync(dir)) return;
 
   let files: string[];
   try {
-    files = readdirSync(dir).filter((file) => file.endsWith(".md"));
+    files = readdirSync(dir)
+      .filter((file) => file.endsWith(".md"))
+      .sort();
   } catch (error) {
     diagnostics.push({ path: dir, message: `Cannot read agent directory: ${errorMessage(error)}` });
     return;
@@ -86,7 +89,7 @@ function loadAgentsFromDir(
 }
 
 export function discoverAgents(cwd: string, includeProjectAgents: boolean): AgentCatalog {
-  const agents = new Map<string, LoadedAgent>();
+  const agents = new Map<string, AgentProfile>();
   const diagnostics: AgentDiagnostic[] = [];
 
   loadAgentsFromDir(BUILTIN_AGENTS_DIR, "builtin", agents, diagnostics);

@@ -116,7 +116,7 @@ Matching is case-insensitive, and a match in either list is sufficient.
 
 ### Subagents (`pi-subagent`)
 
-**Usage:** Ask Pi to delegate a focused task to `explore` for codebase facts or `planner` for an implementation plan. The task runs in an isolated context with live progress in the TUI.
+**Usage:** Ask Pi to delegate a focused task to `explore` for codebase facts or `planner` for an implementation plan. Each task runs in a fresh, in-memory context and returns its final answer to the parent session. While it runs, Pi shows queued and active tasks above the editor.
 
 ```text
 Use the planner subagent to inspect this project and create an implementation plan for adding user authentication.
@@ -126,9 +126,12 @@ Use the planner subagent to inspect this project and create an implementation pl
 
 ```json
 {
-  "enabled": true
+  "enabled": true,
+  "maxConcurrent": 4
 }
 ```
+
+`maxConcurrent` controls how many subagents may run at once (1–32); additional calls wait in FIFO order. Subagents share the current working directory, so parallel editing tasks can conflict.
 
 To add a custom subagent, create a Markdown file in `~/.pi/agent/agents/` for all projects or `.pi/agents/` for the current trusted project. The filename becomes the subagent name. Run `/reload` after changes.
 
@@ -144,14 +147,15 @@ effort: high
 Review the requested changes and report concrete problems with file references.
 ```
 
-| Field         | Required | Purpose                                                                                  |
-| ------------- | -------- | ---------------------------------------------------------------------------------------- |
-| `description` | Yes      | Tells Pi when this subagent is useful.                                                   |
-| `tools`       | No       | Limits the tools it can use. Omit to allow all built-in coding tools.                    |
-| `model`       | No       | Uses a specific model in `provider/model` format. Omit to use the current model.         |
-| `effort`      | No       | Sets reasoning effort: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`.     |
-| `skills`      | No       | Loads selected Pi skills for this subagent. Include `read` in `tools` when using skills. |
-| `maxTurns`    | No       | Limits how many turns the subagent may take.                                             |
+| Field         | Required | Purpose                                                                                                                    |
+| ------------- | -------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `description` | Yes      | Tells Pi when this subagent is useful.                                                                                     |
+| `tools`       | No       | Limits the tools it can use. Omit to allow all built-in coding tools.                                                      |
+| `model`       | No       | Uses a specific `provider/model`. Omit to inherit the current model. Out-of-scope models fall back to the parent model.    |
+| `effort`      | No       | Sets reasoning effort: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`.                                       |
+| `skills`      | No       | Exact allow list of Pi skills. Omit to load no skills.                                                                     |
+| `extensions`  | No       | Exact allow list of extensions. Omit to load none. Tools registered by whitelisted extensions are automatically available. |
+| `maxTurns`    | No       | Limits how many turns the subagent may take; defaults to 50.                                                               |
 
 Project definitions require a trusted project. Name conflicts are resolved in this order: project, global, bundled.
 

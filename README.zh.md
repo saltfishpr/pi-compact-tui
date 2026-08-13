@@ -116,7 +116,7 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 
 ### 子代理（`pi-subagent`）
 
-**使用方法：** 让 Pi 将聚焦任务委派给 `explore` 以查找代码事实，或委派给 `planner` 以制定实现方案。任务会在隔离上下文中运行，并在 TUI 中实时展示进度。
+**使用方法：** 让 Pi 将聚焦任务委派给 `explore` 以查找代码事实，或委派给 `planner` 以制定实现方案。每个任务使用全新的内存上下文，最终答案会返回父会话；运行期间，编辑器上方会显示排队和运行中的任务。
 
 ```text
 使用 planner 子代理检查当前项目，并为添加用户认证制定实现计划。
@@ -126,9 +126,12 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 
 ```json
 {
-  "enabled": true
+  "enabled": true,
+  "maxConcurrent": 4
 }
 ```
+
+`maxConcurrent` 控制同时运行的子代理数量（1–32）；超出的调用按 FIFO 顺序等待。子代理与父会话共用工作目录，并行编辑任务可能发生冲突。
 
 如需添加自定义子代理，在 `~/.pi/agent/agents/` 中创建所有项目可用的 Markdown 文件，或在 `.pi/agents/` 中创建仅供当前已信任项目使用的文件。文件名即子代理名称；修改后执行 `/reload`。
 
@@ -144,14 +147,15 @@ effort: high
 审查指定改动，引用相关文件并报告明确问题。
 ```
 
-| 字段          | 必填 | 用途                                                                        |
-| ------------- | ---- | --------------------------------------------------------------------------- |
-| `description` | 是   | 告诉 Pi 这个子代理适合处理什么任务。                                        |
-| `tools`       | 否   | 限制可用工具；省略时允许使用所有内置编码工具。                              |
-| `model`       | 否   | 使用 `provider/model` 格式指定模型；省略时使用当前模型。                    |
-| `effort`      | 否   | 设置推理档位：`off`、`minimal`、`low`、`medium`、`high`、`xhigh` 或 `max`。 |
-| `skills`      | 否   | 为子代理加载指定 Pi skill；使用时需在 `tools` 中包含 `read`。               |
-| `maxTurns`    | 否   | 限制子代理最多执行多少轮。                                                  |
+| 字段          | 必填 | 用途                                                                                      |
+| ------------- | ---- | ----------------------------------------------------------------------------------------- |
+| `description` | 是   | 告诉 Pi 这个子代理适合处理什么任务。                                                      |
+| `tools`       | 否   | 限制可用工具；省略时允许使用所有内置编码工具。                                            |
+| `model`       | 否   | 使用 `provider/model` 指定模型；省略时继承当前模型；超出父会话 model scope 时回退父模型。 |
+| `effort`      | 否   | 设置推理档位：`off`、`minimal`、`low`、`medium`、`high`、`xhigh` 或 `max`。               |
+| `skills`      | 否   | Pi skill 的精确 allow list；省略时不加载 skill。                                          |
+| `extensions`  | 否   | 扩展（extension）的精确 allow list；省略时不加载扩展；白名单扩展注册的工具会自动可用。    |
+| `maxTurns`    | 否   | 限制子代理最多执行多少轮；默认 50。                                                       |
 
 项目级定义仅在项目受信任时加载。同名定义的优先级为：项目级、全局、内置。
 

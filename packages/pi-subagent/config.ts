@@ -6,13 +6,15 @@ import * as z from "zod";
 const CONFIG_FILE_NAME = "subagent.json";
 
 export const subagentConfigSchema = z.object({
-  enabled: z.boolean(),
+  enabled: z.boolean().default(true),
+  maxConcurrent: z.number().int().min(1).max(32).default(4),
 });
 
 export type SubagentConfig = z.infer<typeof subagentConfigSchema>;
 
 const DEFAULT_CONFIG: SubagentConfig = {
   enabled: true,
+  maxConcurrent: 4,
 };
 
 export function getConfigPath(): string {
@@ -39,7 +41,8 @@ function readConfigFile(path: string): unknown {
   if (!existsSync(path)) return DEFAULT_CONFIG;
   try {
     return JSON.parse(readFileSync(path, "utf8")) as unknown;
-  } catch {
-    return DEFAULT_CONFIG;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Cannot read ${path}: ${message}`);
   }
 }
