@@ -55,7 +55,8 @@
     "@earendil-works/pi-ai": "*",
     "@earendil-works/pi-coding-agent": "*",
     "@earendil-works/pi-tui": "*",
-    "@juicesharp/rpiv-i18n": "*"
+    "@juicesharp/rpiv-i18n": "*",
+    "hosted-git-info": "*"
   },
   "peerDependenciesMeta": {
     "@juicesharp/rpiv-i18n": {
@@ -67,9 +68,11 @@
     "@earendil-works/pi-coding-agent": "^0.84.0",
     "@earendil-works/pi-tui": "^0.84.0",
     "@juicesharp/rpiv-i18n": "*",
+    "@types/hosted-git-info": "^3.0.5",
     "@types/ms": "^2.1.0",
     "@types/node": "^26.0.1",
     "@types/write-file-atomic": "^4.0.3",
+    "hosted-git-info": "^9.0.3",
     "typescript": "^6.0.3",
     "vitest": "^4.1.10"
   }
