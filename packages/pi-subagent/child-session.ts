@@ -70,6 +70,7 @@ export async function createChildSession(options: CreateChildSessionOptions): Pr
       path: extension.path,
       resolvedPath: extension.resolvedPath,
       sourceInfo: extension.sourceInfo,
+      compactLabel: getCompactExtensionLabelAdapter(availableExtensions, extension),
     })),
     skills: loader.getSkills().skills.map((skill) => skill.name),
     extensions: loader.getExtensions().extensions.map((extension) => ({
