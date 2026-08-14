@@ -116,7 +116,7 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 
 ### 子代理（`pi-subagent`）
 
-**使用方法：** 让 Pi 将聚焦任务委派给 `explore` 以查找代码事实，或委派给 `planner` 以制定实现方案。每个任务使用全新的内存上下文，最终答案会返回父会话；运行期间，编辑器上方会显示排队和运行中的任务。
+**使用方法：** 让 Pi 将聚焦任务委派给 `explore` 以查找代码事实，或委派给 `planner` 以制定实现方案。每个任务运行在独立会话中，最终答案会返回父会话。
 
 ```text
 使用 planner 子代理检查当前项目，并为添加用户认证制定实现计划。
@@ -154,8 +154,9 @@ effort: high
 | `model`       | 否   | 使用 `provider/model` 指定模型；省略时继承当前模型；超出父会话 model scope 时回退父模型。 |
 | `effort`      | 否   | 设置推理档位：`off`、`minimal`、`low`、`medium`、`high`、`xhigh` 或 `max`。               |
 | `skills`      | 否   | Pi skill 的精确 allow list；省略时不加载 skill。                                          |
-| `extensions`  | 否   | 扩展（extension）的精确 allow list；省略时不加载扩展；白名单扩展注册的工具会自动可用。    |
 | `maxTurns`    | 否   | 限制子代理最多执行多少轮；默认 50。                                                       |
+
+子代理会话不会加载任何扩展（extension）。
 
 项目级定义仅在项目受信任时加载。同名定义的优先级为：项目级、全局、内置。
 

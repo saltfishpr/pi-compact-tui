@@ -147,7 +147,7 @@ class AgentThread {
       await session.bindExtensions({
         mode: "print",
         onError: (error) => {
-          logger.error("Extension error", {
+          logger.error("bindExtensions", {
             toolCallId: this.id,
             extensionPath: error.extensionPath,
             event: error.event,

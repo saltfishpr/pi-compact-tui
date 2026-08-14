@@ -13,7 +13,7 @@ const frontmatterSchema = z.object({
   description: z.string().min(1),
   tools: z.array(z.string().min(1)).optional(),
   skills: z.array(z.string().min(1)).optional(),
-  extensions: z.array(z.string().min(1)).optional(),
+  // extensions: z.array(z.string().min(1)).optional(),
   model: modelSchema.shape.model,
   effort: z.enum(THINKING_LEVELS).optional(),
   maxTurns: z.number().int().positive().default(50),
