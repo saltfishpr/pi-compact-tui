@@ -18,6 +18,9 @@ type AuditEntryData = {
 };
 
 export default function (pi: ExtensionAPI) {
+  // Windows 没有 pi 的 bash 工具，避免注册不可用的审计命令和事件处理器。
+  if (process.platform === "win32") return;
+
   let resolvedModel: Model<Api> | undefined;
   let thinkingLevel: ModelThinkingLevel = "off";
 
