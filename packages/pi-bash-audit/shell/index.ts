@@ -3,69 +3,83 @@ import { parse } from "unbash";
 
 import { validateCommand } from "./commands";
 
+export interface ReadOnlyPolicy {
+  validateCommand(command: string, args: readonly string[]): boolean;
+}
+
+export const defaultPolicy = { validateCommand };
+
+export function createReadOnlyChecker(policy: ReadOnlyPolicy): (source: string) => boolean {
+  function isReadOnlyScript(script: Script): boolean {
+    return script.commands.every(isReadOnlyNode);
+  }
+
+  function isReadOnlyNode(node: Node): boolean {
+    switch (node.type) {
+      case "Statement":
+        return !node.background && areReadOnlyRedirects(node.redirects) && isReadOnlyNode(node.command);
+      case "Command":
+        return isReadOnlySimpleCommand(node);
+      case "Pipeline":
+      case "AndOr":
+        return node.commands.length > 0 && node.commands.every(isReadOnlyNode);
+      case "If":
+        return isReadOnlyNode(node.clause) && isReadOnlyNode(node.then) && (!node.else || isReadOnlyNode(node.else));
+      case "Subshell":
+      case "BraceGroup":
+        return isReadOnlyNode(node.body);
+      case "CompoundList":
+        return node.commands.every(isReadOnlyNode);
+      case "Case":
+        return isReadOnlyCase(node);
+      case "TestCommand":
+        return isStaticTestExpression(node.expression);
+      // 循环、函数、协程、算术命令天然会引入变量绑定或迭代副作用，一律拒绝。
+      case "For":
+      case "ArithmeticFor":
+      case "Select":
+      case "While":
+      case "Function":
+      case "Coproc":
+      case "ArithmeticCommand":
+        return false;
+    }
+  }
+
+  function isReadOnlySimpleCommand(node: Command): boolean {
+    if (node.prefix.length > 0) return false;
+    if (!node.name || !isStaticWord(node.name)) return false;
+    if (!node.suffix.every(isStaticWord)) return false;
+    if (!areReadOnlyRedirects(node.redirects)) return false;
+
+    return policy.validateCommand(
+      node.name.value,
+      node.suffix.map((word) => word.value),
+    );
+  }
+
+  function isReadOnlyCase(node: Case): boolean {
+    if (!isStaticWord(node.word)) return false;
+    return node.items.every((item) => item.pattern.every(isStaticCasePattern) && isReadOnlyNode(item.body));
+  }
+
+  return (source: string): boolean => {
+    if (!source.trim()) return false;
+
+    try {
+      const script = parse(source);
+      return !script.errors?.length && script.commands.length > 0 && isReadOnlyScript(script);
+    } catch {
+      return false;
+    }
+  };
+}
+
+const defaultChecker = createReadOnlyChecker(defaultPolicy);
+
 // false means "not proven read-only"; callers must send it through LLM review.
 export function isReadOnly(source: string): boolean {
-  if (!source.trim()) return false;
-
-  try {
-    const script = parse(source);
-    return !script.errors?.length && script.commands.length > 0 && isReadOnlyScript(script);
-  } catch {
-    return false;
-  }
-}
-
-function isReadOnlyScript(script: Script): boolean {
-  return script.commands.every(isReadOnlyNode);
-}
-
-function isReadOnlyNode(node: Node): boolean {
-  switch (node.type) {
-    case "Statement":
-      return !node.background && areReadOnlyRedirects(node.redirects) && isReadOnlyNode(node.command);
-    case "Command":
-      return isReadOnlySimpleCommand(node);
-    case "Pipeline":
-    case "AndOr":
-      return node.commands.length > 0 && node.commands.every(isReadOnlyNode);
-    case "If":
-      return isReadOnlyNode(node.clause) && isReadOnlyNode(node.then) && (!node.else || isReadOnlyNode(node.else));
-    case "Subshell":
-    case "BraceGroup":
-      return isReadOnlyNode(node.body);
-    case "CompoundList":
-      return node.commands.every(isReadOnlyNode);
-    case "Case":
-      return isReadOnlyCase(node);
-    case "TestCommand":
-      return isStaticTestExpression(node.expression);
-    // 循环、函数、协程、算术命令天然会引入变量绑定或迭代副作用，一律拒绝。
-    case "For":
-    case "ArithmeticFor":
-    case "Select":
-    case "While":
-    case "Function":
-    case "Coproc":
-    case "ArithmeticCommand":
-      return false;
-  }
-}
-
-function isReadOnlySimpleCommand(node: Command): boolean {
-  if (node.prefix.length > 0) return false;
-  if (!node.name || !isStaticWord(node.name)) return false;
-  if (!node.suffix.every(isStaticWord)) return false;
-  if (!areReadOnlyRedirects(node.redirects)) return false;
-
-  return validateCommand(
-    node.name.value,
-    node.suffix.map((word) => word.value),
-  );
-}
-
-function isReadOnlyCase(node: Case): boolean {
-  if (!isStaticWord(node.word)) return false;
-  return node.items.every((item) => item.pattern.every(isStaticCasePattern) && isReadOnlyNode(item.body));
+  return defaultChecker(source);
 }
 
 // 允许的重定向：
