@@ -1,5 +1,23 @@
 import { isExactOption, setOf, validateOptions } from "./options";
 
+const READ_ONLY_SUBCOMMANDS = new Set([
+  "blame",
+  "check-attr",
+  "check-ignore",
+  "count-objects",
+  "describe",
+  "for-each-ref",
+  "ls-files",
+  "ls-tree",
+  "merge-base",
+  "name-rev",
+  "rev-list",
+  "rev-parse",
+  "show-ref",
+  "verify-commit",
+  "verify-tag",
+]);
+
 export function validateGit(args: readonly string[]): boolean {
   const [subcommand, ...rest] = args;
   switch (subcommand) {
@@ -34,8 +52,10 @@ export function validateGit(args: readonly string[]): boolean {
       return validateRemote(rest);
     case "config":
       return validateConfig(rest);
+    case "reflog":
+      return validateReflog(rest);
     default:
-      return false;
+      return READ_ONLY_SUBCOMMANDS.has(subcommand);
   }
 }
 
@@ -148,6 +168,12 @@ function validateRemote(args: readonly string[]): boolean {
     });
   }
   return false;
+}
+
+function validateReflog(args: readonly string[]): boolean {
+  if (args.length === 0) return true;
+  if (args[0] !== "show") return false;
+  return validateHistory(args.slice(1));
 }
 
 function validateConfig(args: readonly string[]): boolean {
