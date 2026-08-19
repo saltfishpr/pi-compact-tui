@@ -1,7 +1,6 @@
 import { CONFIG_DIR_NAME, getAgentDir } from "@earendil-works/pi-coding-agent";
 import { defu } from "defu";
-import type { StringValue } from "ms";
-import ms from "ms";
+import ms, { type StringValue } from "ms";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as z from "zod";

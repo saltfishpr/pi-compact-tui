@@ -1,7 +1,11 @@
 import type { Api, Message, Model, ModelThinkingLevel, SimpleStreamOptions, Usage } from "@earendil-works/pi-ai";
 import { completeSimple } from "@earendil-works/pi-ai/compat";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { convertToLlm, serializeConversation } from "@earendil-works/pi-coding-agent";
+import {
+  convertToLlm,
+  serializeConversation,
+  type ExtensionAPI,
+  type ExtensionContext,
+} from "@earendil-works/pi-coding-agent";
 import { resolveModel } from "../pi-common";
 import type { RecapConfig } from "./config";
 import { clearRecapWidget, setRecapLoadingWidget, setRecapTextWidget } from "./widget";

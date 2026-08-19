@@ -1,15 +1,15 @@
 import { Type, type TextContent } from "@earendil-works/pi-ai";
 import {
-  AgentToolResult,
-  ExtensionAPI,
-  ExtensionContext,
   getMarkdownTheme,
   keyHint,
+  type AgentToolResult,
+  type ExtensionAPI,
+  type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { Box, Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
 
 import { resolveModel, type UsageTotals } from "../pi-common";
-import { AgentDiagnostic, AgentProfile, discoverAgents } from "./agents";
+import { discoverAgents, type AgentDiagnostic, type AgentProfile } from "./agents";
 import { inChildSessionContext } from "./child-context";
 import { loadConfig } from "./config";
 import { formatDuration, formatUsage } from "./format";

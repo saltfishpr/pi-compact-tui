@@ -1,4 +1,4 @@
-import { UsageTotals } from "../pi-common";
+import type { UsageTotals } from "../pi-common";
 
 export function formatTokens(count: number): string {
   if (!count) return "0";

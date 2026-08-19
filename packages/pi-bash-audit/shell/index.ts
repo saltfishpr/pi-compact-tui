@@ -1,5 +1,15 @@
-import type { Case, Command, DoubleQuotedChild, Node, Redirect, Script, TestExpression, Word, WordPart } from "unbash";
-import { parse } from "unbash";
+import {
+  parse,
+  type Case,
+  type Command,
+  type DoubleQuotedChild,
+  type Node,
+  type Redirect,
+  type Script,
+  type TestExpression,
+  type Word,
+  type WordPart,
+} from "unbash";
 
 import { validateCommand } from "./commands";
 

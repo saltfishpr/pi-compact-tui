@@ -4,8 +4,7 @@ import type {
   ReadonlyFooterDataProvider,
   Theme,
 } from "@earendil-works/pi-coding-agent";
-import type { Component, TUI } from "@earendil-works/pi-tui";
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { type Component, truncateToWidth, type TUI, visibleWidth } from "@earendil-works/pi-tui";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { addUsageToTotals, createUsageTotals, type UsageTotals } from "../pi-common";
 import { type FooterConfig, getStatusKey, loadConfig } from "./config";

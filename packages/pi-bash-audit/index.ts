@@ -4,10 +4,10 @@ import { Container, Text } from "@earendil-works/pi-tui";
 
 import { createLogger, resolveModel } from "../pi-common";
 import { auditCommand } from "./auditor";
-import { BashAuditConfig, loadConfig, ReadOnlyRule, saveConfig } from "./config";
+import { loadConfig, saveConfig, type BashAuditConfig, type ReadOnlyRule } from "./config";
 import { createRulePolicy } from "./rules";
 import { selectAuditModel, selectAuditThinkingLevel } from "./selector";
-import { createReadOnlyChecker, defaultPolicy, ReadOnlyPolicy } from "./shell";
+import { createReadOnlyChecker, defaultPolicy, type ReadOnlyPolicy } from "./shell";
 
 const logger = createLogger("pi-bash-audit");
 

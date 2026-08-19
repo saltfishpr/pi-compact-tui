@@ -1,5 +1,4 @@
-import type { Api, Model, ModelThinkingLevel } from "@earendil-works/pi-ai";
-import { clampThinkingLevel } from "@earendil-works/pi-ai";
+import { clampThinkingLevel, type Api, type Model, type ModelThinkingLevel } from "@earendil-works/pi-ai";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 export interface ResolveModelOptions {
