@@ -197,6 +197,35 @@ Project definitions require a trusted project. Name conflicts are resolved in th
 - `enable` — optional; defaults to `true`. Set it to `false` to disable auditing while keeping the configuration.
 - `model` — required to enable auditing, in `provider/model` format.
 - `thinkingLevel` — optional; `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`.
+- `readOnlyRules` — optional; custom read-only allowlist applied on top of the built-in one (`cat`, `ls`, `git status`, etc.). Each rule has:
+  - `command` — must match the command name exactly.
+  - `args` — pattern array matched against the full argument list:
+    - a literal matches one argument exactly;
+    - a glob with `*` matches any content within a single argument;
+    - `**` as a standalone element absorbs any number of arguments (including none);
+    - `/regex/` full-matches a single argument;
+    - if every element is a literal, the rule behaves as a prefix match (equivalent to appending `**`).
+  - `except` — optional; if any entry's `args` patterns match, the rule is vetoed (same syntax as `args`).
+
+  Example:
+
+  ```json
+  {
+    "enable": true,
+    "model": "openai/gpt-4o-mini",
+    "readOnlyRules": [
+      { "command": "git", "args": ["log", "**"] },
+      { "command": "npm", "args": ["run", "*"] },
+      { "command": "docker", "args": ["image", "ls", "**"] },
+      { "command": "uv", "args": ["/sync|check/"] },
+      {
+        "command": "pnpm",
+        "args": ["run", "**"],
+        "except": [{ "args": ["run", "deploy"] }]
+      }
+    ]
+  }
+  ```
 
 ### Session Tips (`pi-tips`)
 

@@ -4,9 +4,10 @@ import { Container, Text } from "@earendil-works/pi-tui";
 
 import { createLogger, resolveModel } from "../pi-common";
 import { auditCommand } from "./auditor";
-import { loadConfig, saveConfig, type BashAuditConfig } from "./config";
+import { BashAuditConfig, loadConfig, ReadOnlyRule, saveConfig } from "./config";
+import { createRulePolicy } from "./rules";
 import { selectAuditModel, selectAuditThinkingLevel } from "./selector";
-import { isReadOnly } from "./shell";
+import { createReadOnlyChecker, defaultPolicy, ReadOnlyPolicy } from "./shell";
 
 const logger = createLogger("pi-bash-audit");
 
@@ -17,12 +18,22 @@ type AuditEntryData = {
   message: string;
 };
 
+function createReadOnlyPolicy(readOnlyRules: readonly ReadOnlyRule[]): ReadOnlyPolicy {
+  const rulePolicy = createRulePolicy(readOnlyRules);
+  return {
+    validateCommand(command, args) {
+      return rulePolicy.validateCommand(command, args) || defaultPolicy.validateCommand(command, args);
+    },
+  };
+}
+
 export default function (pi: ExtensionAPI) {
   // Windows 没有 pi 的 bash 工具，避免注册不可用的审计命令和事件处理器。
   if (process.platform === "win32") return;
 
   let resolvedModel: Model<Api> | undefined;
   let thinkingLevel: ModelThinkingLevel = "off";
+  let isReadOnly = createReadOnlyChecker(createReadOnlyPolicy([]));
 
   pi.registerEntryRenderer<AuditEntryData>(ENTRY_TYPE, (entry, _options, theme) => {
     const data = entry.data;
@@ -68,13 +79,12 @@ export default function (pi: ExtensionAPI) {
       const selectedLevel = await selectAuditThinkingLevel(ctx, initialLevel, availableLevels);
       if (!selectedLevel) return;
 
-      const config = {
-        enable: true,
-        model: modelId,
-        thinkingLevel: selectedLevel,
-      } satisfies BashAuditConfig;
       try {
-        saveConfig(config);
+        saveConfig({
+          enable: true,
+          model: modelId,
+          thinkingLevel: selectedLevel,
+        });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         ctx.ui.notify(`[bash-audit] failed to save configuration: ${message}`, "error");
@@ -88,8 +98,18 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("session_start", async (_event, ctx) => {
+    resolvedModel = undefined;
     const config = loadConfig();
     if (!config.enable) return;
+
+    let readOnlyPolicy: ReadOnlyPolicy;
+    try {
+      readOnlyPolicy = createReadOnlyPolicy(config.readOnlyRules);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      ctx.ui.notify(`[bash-audit] invalid readOnlyRules: ${message}`, "error");
+      return;
+    }
 
     const resolved = resolveModel(ctx, {
       model: config.model,
@@ -105,6 +125,7 @@ export default function (pi: ExtensionAPI) {
     }
     resolvedModel = resolved.model;
     thinkingLevel = resolved.thinkingLevel;
+    isReadOnly = createReadOnlyChecker(readOnlyPolicy);
   });
 
   pi.on("tool_call", async (event, ctx) => {

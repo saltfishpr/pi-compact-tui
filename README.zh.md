@@ -197,6 +197,35 @@ effort: high
 - `enable` — 可选，默认为 `true`；设为 `false` 可在保留配置的同时关闭审计。
 - `model` — 启用审计所必需，格式为 `provider/model`。
 - `thinkingLevel` — 可选，可设为 `off`、`minimal`、`low`、`medium`、`high`、`xhigh` 或 `max`。
+- `readOnlyRules` — 可选，自定义只读白名单，在内置白名单（`cat`、`ls`、`git status` 等）之上追加。每条规则：
+  - `command` — 必须与命令名逐字一致；
+  - `args` — 参数模式数组，与完整参数列表匹配：
+    - 字面量：与对应参数逐字相等；
+    - 含 `*` 的 glob：匹配单个参数内的任意内容；
+    - 独立元素 `**`：吸收任意数量（含 0 个）参数；
+    - `/正则/`：对单个参数做全匹配；
+    - 若 `args` 全为字面量，按前缀匹配处理（等价于末尾追加 `**`）。
+  - `except` — 可选，任一 `args` 模式命中即否决该规则（语法同上）。
+
+  示例：
+
+  ```json
+  {
+    "enable": true,
+    "model": "openai/gpt-4o-mini",
+    "readOnlyRules": [
+      { "command": "git", "args": ["log", "**"] },
+      { "command": "npm", "args": ["run", "*"] },
+      { "command": "docker", "args": ["image", "ls", "**"] },
+      { "command": "uv", "args": ["/sync|check/"] },
+      {
+        "command": "pnpm",
+        "args": ["run", "**"],
+        "except": [{ "args": ["run", "deploy"] }]
+      }
+    ]
+  }
+  ```
 
 ### 会话小贴士（`pi-tips`）
 

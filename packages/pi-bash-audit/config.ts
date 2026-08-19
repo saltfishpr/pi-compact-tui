@@ -9,8 +9,21 @@ import { modelSchema } from "../pi-common";
 
 const CONFIG_FILE_NAME = "bash-audit.json";
 
+const readOnlyExceptionSchema = z.object({
+  args: z.array(z.string().trim().min(1)).min(1),
+});
+
+const readOnlyRuleSchema = z.object({
+  command: z.string().trim().min(1),
+  args: z.array(z.string().trim().min(1)).default([]),
+  except: z.array(readOnlyExceptionSchema).default([]),
+});
+
+export type ReadOnlyRule = z.infer<typeof readOnlyRuleSchema>;
+
 export const bashAuditConfigSchema = modelSchema.extend({
   enable: z.boolean().default(true),
+  readOnlyRules: z.array(readOnlyRuleSchema).default([]),
 });
 
 export type BashAuditConfig = z.infer<typeof bashAuditConfigSchema>;
@@ -27,17 +40,21 @@ export function loadConfig(): BashAuditConfig {
   return bashAuditConfigSchema.parse(raw);
 }
 
-/** saveConfig atomically overwrites bash-audit.json with canonical fields. */
-export function saveConfig(config: BashAuditConfig): void {
-  const parsed = bashAuditConfigSchema.parse(config);
-  const canonical = {
-    enable: parsed.enable,
-    model: parsed.model,
-    thinkingLevel: parsed.thinkingLevel,
-  };
+/**
+ * saveConfig atomically merges updates into bash-audit.json and writes canonical fields.
+ * Array fields are replaced rather than merged.
+ */
+export function saveConfig(update: Partial<BashAuditConfig>): void {
+  let current: BashAuditConfig;
+  try {
+    current = loadConfig();
+  } catch {
+    current = bashAuditConfigSchema.parse({});
+  }
+  const parsed = bashAuditConfigSchema.parse({ ...current, ...update });
   const path = getConfigPath();
   mkdirSync(dirname(path), { recursive: true });
-  writeFileAtomic.sync(path, `${JSON.stringify(canonical, null, 2)}\n`);
+  writeFileAtomic.sync(path, `${JSON.stringify(parsed, null, 2)}\n`);
 }
 
 function getConfigPath(): string {
