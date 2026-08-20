@@ -1,8 +1,8 @@
 import { getSupportedThinkingLevels, type Api, type Model, type ModelThinkingLevel } from "@earendil-works/pi-ai";
-import { isToolCallEventType, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { ExtensionContext, isToolCallEventType, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Container, Text } from "@earendil-works/pi-tui";
 
-import { createLogger, resolveModel } from "../pi-common";
+import { createLogger, resolveModel, ScrollableSelectorComponent } from "../pi-common";
 import { auditCommand } from "./auditor";
 import { loadConfig, saveConfig, type BashAuditConfig, type ReadOnlyRule } from "./config";
 import { createRulePolicy } from "./rules";
@@ -157,7 +157,8 @@ export default function (pi: ExtensionAPI) {
     }
 
     if (result.kind === "failed") {
-      const proceed = await ctx.ui.confirm(
+      const proceed = await confirmWithScrollableMessage(
+        ctx,
         "Bash audit failed",
         `Audit could not complete: ${result.reason}\n\nCommand:\n${command}\n\nExecute anyway?`,
       );
@@ -165,7 +166,8 @@ export default function (pi: ExtensionAPI) {
     }
 
     if (result.risk === "high") {
-      const proceed = await ctx.ui.confirm(
+      const proceed = await confirmWithScrollableMessage(
+        ctx,
         "High-risk bash command",
         `Reason: ${result.reason}\n\nCommand:\n${command}\n\nAllow execution?`,
       );
@@ -176,5 +178,35 @@ export default function (pi: ExtensionAPI) {
       risk: result.risk,
       message: `${result.risk}: ${result.reason}`,
     });
+  });
+}
+
+/** confirmWithScrollableMessage displays a half-height, scrollable confirmation prompt in TUI mode. */
+function confirmWithScrollableMessage(ctx: ExtensionContext, title: string, message: string): Promise<boolean> {
+  if (ctx.mode !== "tui") return ctx.ui.confirm(title, message);
+
+  return ctx.ui.custom<boolean>((tui, theme, keybindings, done) => {
+    const selector = new ScrollableSelectorComponent(
+      title,
+      message,
+      ["Yes", "No"],
+      (selected) => done(selected === "Yes"),
+      () => done(false),
+      {
+        maxMessageHeight: Math.max(10, Math.floor(tui.terminal.rows / 2)),
+        maxVisibleOptions: 2,
+        theme,
+        keybindings,
+      },
+    );
+
+    return {
+      render: (width: number) => selector.render(width),
+      invalidate: () => selector.invalidate(),
+      handleInput: (data: string) => {
+        selector.handleInput(data);
+        tui.requestRender();
+      },
+    };
   });
 }

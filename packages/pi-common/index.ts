@@ -1,3 +1,4 @@
+export { ScrollableSelectorComponent, type ScrollableSelectorOptions } from "./components/scrollable-selector";
 export { modelSchema, THINKING_LEVELS } from "./config";
 export type { ModelConfig } from "./config";
 export { createLogger } from "./logger";
