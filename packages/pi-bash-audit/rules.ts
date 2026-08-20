@@ -20,7 +20,7 @@ export function createRulePolicy(rules: readonly ReadOnlyRule[]): ReadOnlyPolicy
   const compiledRules = rules.map(compileRule);
 
   return {
-    validateCommand(command, args) {
+    isReadOnlyCommand(command, args) {
       return compiledRules.some(
         (rule) =>
           rule.command === command &&

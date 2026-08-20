@@ -11,13 +11,13 @@ import {
   type WordPart,
 } from "unbash";
 
-import { validateCommand } from "./commands";
+import { isReadOnlyCommand } from "./read-only";
 
 export interface ReadOnlyPolicy {
-  validateCommand(command: string, args: readonly string[]): boolean;
+  isReadOnlyCommand(command: string, args: readonly string[]): boolean;
 }
 
-export const defaultPolicy = { validateCommand };
+export const defaultPolicy = { isReadOnlyCommand };
 
 export function createReadOnlyChecker(policy: ReadOnlyPolicy): (source: string) => boolean {
   function isReadOnlyScript(script: Script): boolean {
@@ -62,7 +62,7 @@ export function createReadOnlyChecker(policy: ReadOnlyPolicy): (source: string) 
     if (!node.suffix.every(isStaticWord)) return false;
     if (!areReadOnlyRedirects(node.redirects)) return false;
 
-    return policy.validateCommand(
+    return policy.isReadOnlyCommand(
       node.name.value,
       node.suffix.map((word) => word.value),
     );

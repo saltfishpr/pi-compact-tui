@@ -36,9 +36,9 @@ function isAlwaysReadOnlyCommand(command: string): boolean {
   return READ_ONLY_COMMANDS.has(command);
 }
 
-type ArgumentValidator = (args: readonly string[]) => boolean;
+type ReadOnlyArgumentValidator = (args: readonly string[]) => boolean;
 
-const VALIDATORS: Partial<Record<string, ArgumentValidator>> = {
+const READ_ONLY_COMMAND_VALIDATORS: Record<string, ReadOnlyArgumentValidator> = {
   date: validateDate,
   env: validateEnv,
   fd: validateFd,
@@ -51,7 +51,7 @@ const VALIDATORS: Partial<Record<string, ArgumentValidator>> = {
   tree: validateTree,
 };
 
-export function validateCommand(command: string, args: readonly string[]): boolean {
+export function isReadOnlyCommand(command: string, args: readonly string[]): boolean {
   if (isAlwaysReadOnlyCommand(command)) return true;
-  return VALIDATORS[command]?.(args) ?? false;
+  return READ_ONLY_COMMAND_VALIDATORS[command]?.(args) ?? false;
 }

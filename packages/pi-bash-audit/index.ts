@@ -21,8 +21,8 @@ type AuditEntryData = {
 function createReadOnlyPolicy(readOnlyRules: readonly ReadOnlyRule[]): ReadOnlyPolicy {
   const rulePolicy = createRulePolicy(readOnlyRules);
   return {
-    validateCommand(command, args) {
-      return rulePolicy.validateCommand(command, args) || defaultPolicy.validateCommand(command, args);
+    isReadOnlyCommand(command, args) {
+      return rulePolicy.isReadOnlyCommand(command, args) || defaultPolicy.isReadOnlyCommand(command, args);
     },
   };
 }
