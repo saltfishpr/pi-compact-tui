@@ -17,6 +17,8 @@
   },
   "files": [
     "packages",
+    "!packages/**/*.test.ts",
+    "!packages/**/*.manual.ts",
     "README.md",
     "README.zh.md",
     "LICENSE"

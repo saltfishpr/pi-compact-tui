@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { ScrollableSelectorComponent } from "./scrollable-selector";
 
-// pi -ne -e packages/pi-common/components/scrollable-selector.test.ts
+// pi -ne -e packages/pi-common/components/scrollable-selector.manual.ts
 export default function (pi: ExtensionAPI) {
   pi.registerCommand("test-scroll-selector", {
     description: "Test ScrollableSelectorComponent",
