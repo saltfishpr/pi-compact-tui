@@ -1,15 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { isReadOnly } from "./index";
+import { createScriptEvaluator, defaultPolicy, type CommandPolicy } from "./index";
 
-describe("isReadOnly", () => {
+const evaluateDefaultPolicy = createScriptEvaluator(defaultPolicy);
+
+describe("defaultPolicy", () => {
   describe("empty / invalid input", () => {
     it.each(["", "   ", "\n\t"])("rejects blank source %j", (source) => {
-      expect(isReadOnly(source)).toBe(false);
+      expect(evaluateDefaultPolicy(source)).toBe("auto");
     });
 
     it("rejects unparseable source", () => {
-      expect(isReadOnly("echo 'unterminated")).toBe(false);
+      expect(evaluateDefaultPolicy("echo 'unterminated")).toBe("auto");
     });
   });
 
@@ -31,7 +33,7 @@ describe("isReadOnly", () => {
       "cd /tmp",
       "cd ..",
     ])("allows %j", (source) => {
-      expect(isReadOnly(source)).toBe(true);
+      expect(evaluateDefaultPolicy(source)).toBe("allow");
     });
 
     it.each([
@@ -44,7 +46,7 @@ describe("isReadOnly", () => {
       "pnpm add zod",
       "sudo ls",
     ])("rejects %j", (source) => {
-      expect(isReadOnly(source)).toBe(false);
+      expect(evaluateDefaultPolicy(source)).toBe("auto");
     });
   });
 
@@ -62,7 +64,7 @@ describe("isReadOnly", () => {
       "git config --get user.email",
       "git config --list",
     ])("allows %j", (source) => {
-      expect(isReadOnly(source)).toBe(true);
+      expect(evaluateDefaultPolicy(source)).toBe("allow");
     });
 
     it.each([
@@ -74,7 +76,7 @@ describe("isReadOnly", () => {
       "git branch new-branch",
       "git config user.email me@example.com",
     ])("rejects %j", (source) => {
-      expect(isReadOnly(source)).toBe(false);
+      expect(evaluateDefaultPolicy(source)).toBe("auto");
     });
   });
 
@@ -89,11 +91,11 @@ describe("isReadOnly", () => {
       "find . -maxdepth 3 -name 'README*'",
       "tree -L 2 src",
     ])("allows %j", (source) => {
-      expect(isReadOnly(source)).toBe(true);
+      expect(evaluateDefaultPolicy(source)).toBe("allow");
     });
 
     it.each(["find . -name '*.log' -delete", "find . -exec rm {} \\;"])("rejects %j", (source) => {
-      expect(isReadOnly(source)).toBe(false);
+      expect(evaluateDefaultPolicy(source)).toBe("auto");
     });
   });
 
@@ -108,7 +110,7 @@ describe("isReadOnly", () => {
       "go mod graph",
       "go mod why golang.org/x/text",
     ])("allows %j", (source) => {
-      expect(isReadOnly(source)).toBe(true);
+      expect(evaluateDefaultPolicy(source)).toBe("allow");
     });
 
     it.each([
@@ -119,7 +121,7 @@ describe("isReadOnly", () => {
       "go install example.com/cmd/foo",
       "go mod tidy",
     ])("rejects %j", (source) => {
-      expect(isReadOnly(source)).toBe(false);
+      expect(evaluateDefaultPolicy(source)).toBe("auto");
     });
   });
 
@@ -131,11 +133,11 @@ describe("isReadOnly", () => {
       "rg -n 'TODO' src | wc -l",
       "ps | grep node",
     ])("allows %j", (source) => {
-      expect(isReadOnly(source)).toBe(true);
+      expect(evaluateDefaultPolicy(source)).toBe("allow");
     });
 
     it.each(["cat file | tee out.txt", "ls | xargs rm"])("rejects %j", (source) => {
-      expect(isReadOnly(source)).toBe(false);
+      expect(evaluateDefaultPolicy(source)).toBe("auto");
     });
   });
 
@@ -147,11 +149,11 @@ describe("isReadOnly", () => {
       "which node && echo present",
       "cd src && rg -n TODO 2>/dev/null | head -n 20",
     ])("allows %j", (source) => {
-      expect(isReadOnly(source)).toBe(true);
+      expect(evaluateDefaultPolicy(source)).toBe("allow");
     });
 
     it.each(["git status && git commit -am wip", "cat file || rm file"])("rejects %j", (source) => {
-      expect(isReadOnly(source)).toBe(false);
+      expect(evaluateDefaultPolicy(source)).toBe("auto");
     });
   });
 
@@ -170,7 +172,7 @@ describe("isReadOnly", () => {
       "cat foo &>>/dev/null",
       "echo hi 1>&2",
     ])("allows read-only redirects %j", (source) => {
-      expect(isReadOnly(source)).toBe(true);
+      expect(evaluateDefaultPolicy(source)).toBe("allow");
     });
 
     it.each([
@@ -181,7 +183,7 @@ describe("isReadOnly", () => {
       "cat file &>> combined.log",
       "cat file 2>&$fd",
     ])("rejects write redirects %j", (source) => {
-      expect(isReadOnly(source)).toBe(false);
+      expect(evaluateDefaultPolicy(source)).toBe("auto");
     });
   });
 
@@ -197,13 +199,13 @@ describe("isReadOnly", () => {
       "ls *.ts",
       "ls file?.txt",
     ])("rejects %j", (source) => {
-      expect(isReadOnly(source)).toBe(false);
+      expect(evaluateDefaultPolicy(source)).toBe("auto");
     });
 
     it.each(["echo 'literal $HOME'", 'echo "plain text"', "cat ~/.bashrc", "ls ~", "cd ~/repos"])(
       "allows literal-only strings %j",
       (source) => {
-        expect(isReadOnly(source)).toBe(true);
+        expect(evaluateDefaultPolicy(source)).toBe("allow");
       },
     );
   });
@@ -216,7 +218,7 @@ describe("isReadOnly", () => {
       "{ pwd; ls; }",
       "case foo in bar) echo one;; foo) echo two;; esac",
     ])("allows %j", (source) => {
-      expect(isReadOnly(source)).toBe(true);
+      expect(evaluateDefaultPolicy(source)).toBe("allow");
     });
 
     it.each([
@@ -226,7 +228,7 @@ describe("isReadOnly", () => {
       "myfunc() { ls; }",
       "if [[ -f README.md ]]; then rm README.md; fi",
     ])("rejects %j", (source) => {
-      expect(isReadOnly(source)).toBe(false);
+      expect(evaluateDefaultPolicy(source)).toBe("auto");
     });
   });
 });

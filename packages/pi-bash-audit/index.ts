@@ -4,10 +4,10 @@ import { Container, Text } from "@earendil-works/pi-tui";
 
 import { createLogger, resolveModel, ScrollableSelectorComponent } from "../pi-common";
 import { auditCommand } from "./auditor";
-import { loadConfig, saveConfig, type BashAuditConfig, type ReadOnlyRule } from "./config";
+import { loadConfig, saveConfig, type BashAuditConfig, type Rule } from "./config";
 import { createRulePolicy } from "./rules";
 import { selectAuditModel, selectAuditThinkingLevel } from "./selector";
-import { createReadOnlyChecker, defaultPolicy, type ReadOnlyPolicy } from "./shell";
+import { createScriptEvaluator, defaultPolicy, type Action } from "./shell";
 
 const logger = createLogger("pi-bash-audit");
 
@@ -18,23 +18,7 @@ type AuditEntryData = {
   message: string;
 };
 
-function createReadOnlyPolicy(readOnlyRules: readonly ReadOnlyRule[]): ReadOnlyPolicy {
-  const rulePolicy = createRulePolicy(readOnlyRules);
-  return {
-    isReadOnlyCommand(command, args) {
-      return rulePolicy.isReadOnlyCommand(command, args) || defaultPolicy.isReadOnlyCommand(command, args);
-    },
-  };
-}
-
 export default function (pi: ExtensionAPI) {
-  // Windows 没有 pi 的 bash 工具，避免注册不可用的审计命令和事件处理器。
-  if (process.platform === "win32") return;
-
-  let resolvedModel: Model<Api> | undefined;
-  let thinkingLevel: ModelThinkingLevel = "off";
-  let isReadOnly = createReadOnlyChecker(createReadOnlyPolicy([]));
-
   pi.registerEntryRenderer<AuditEntryData>(ENTRY_TYPE, (entry, _options, theme) => {
     const data = entry.data;
     if (!data) return new Container();
@@ -42,6 +26,46 @@ export default function (pi: ExtensionAPI) {
     const color = data.risk === "medium" ? "warning" : "dim";
     return new Text(theme.fg(color, `[bash-audit] ${data.message}`), 0, 0);
   });
+
+  // Windows 没有 pi 的 bash 工具，避免注册不可用的审计命令和事件处理器。
+  if (process.platform === "win32") return;
+
+  let config = loadConfig();
+  let resolvedModel: Model<Api> | undefined;
+  let thinkingLevel: ModelThinkingLevel = "off";
+  let evaluateScript = createScriptEvaluator(defaultPolicy);
+
+  function initializeAudit(auditConfig: BashAuditConfig, ctx: ExtensionContext): void {
+    // reset state
+    resolvedModel = undefined;
+    thinkingLevel = "off";
+    evaluateScript = createScriptEvaluator(defaultPolicy);
+
+    if (!auditConfig.enable) return;
+
+    try {
+      evaluateScript = createScriptEvaluator(createRulePolicy(auditConfig.rules, defaultPolicy));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      ctx.ui.notify(`[bash-audit] invalid rules: ${message}`, "error");
+      return;
+    }
+
+    const resolved = resolveModel(ctx, {
+      model: auditConfig.model,
+      thinkingLevel: auditConfig.thinkingLevel,
+    });
+    if (!resolved) {
+      if (auditConfig.model) {
+        ctx.ui.notify(`[bash-audit] model "${auditConfig.model}" not found, auto bash-audit disabled`, "warning");
+      } else {
+        ctx.ui.notify(`[bash-audit] no model configured, run "/audit" to select one`);
+      }
+      return;
+    }
+    resolvedModel = resolved.model;
+    thinkingLevel = resolved.thinkingLevel;
+  }
 
   pi.registerCommand("audit", {
     description: "Configure and enable bash command auditing",
@@ -59,22 +83,15 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      let previousConfig: BashAuditConfig | undefined;
-      try {
-        previousConfig = loadConfig();
-      } catch {
-        // A complete selection will replace malformed configuration.
-      }
-
-      const previousModel = previousConfig?.model
-        ? models.find((model) => `${model.provider}/${model.id}` === previousConfig?.model)
+      const previousModel = config.model
+        ? models.find((model) => `${model.provider}/${model.id}` === config.model)
         : undefined;
       const selectedModel = await selectAuditModel(ctx, models, previousModel);
       if (!selectedModel) return;
 
       const modelId = `${selectedModel.provider}/${selectedModel.id}`;
       const availableLevels = getSupportedThinkingLevels(selectedModel);
-      const configuredLevel = previousConfig?.model === modelId ? (previousConfig.thinkingLevel ?? "off") : "off";
+      const configuredLevel = config.model === modelId ? (config.thinkingLevel ?? "off") : "off";
       const initialLevel = availableLevels.includes(configuredLevel) ? configuredLevel : "off";
       const selectedLevel = await selectAuditThinkingLevel(ctx, initialLevel, availableLevels);
       if (!selectedLevel) return;
@@ -91,49 +108,45 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      resolvedModel = selectedModel;
-      thinkingLevel = selectedLevel;
+      config = loadConfig(); // reload config
+      initializeAudit(config, ctx);
       ctx.ui.notify(`[bash-audit] enabled with ${modelId} (${selectedLevel})`, "info");
     },
   });
 
   pi.on("session_start", async (_event, ctx) => {
-    resolvedModel = undefined;
-    const config = loadConfig();
-    if (!config.enable) return;
-
-    let readOnlyPolicy: ReadOnlyPolicy;
-    try {
-      readOnlyPolicy = createReadOnlyPolicy(config.readOnlyRules);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      ctx.ui.notify(`[bash-audit] invalid readOnlyRules: ${message}`, "error");
-      return;
-    }
-
-    const resolved = resolveModel(ctx, {
-      model: config.model,
-      thinkingLevel: config.thinkingLevel,
-    });
-    if (!resolved) {
-      if (config.model) {
-        ctx.ui.notify(`[bash-audit] model "${config.model}" not found, bash-audit disabled`, "warning");
-      } else {
-        ctx.ui.notify(`[bash-audit] no model configured, run "/audit" to select one`);
-      }
-      return;
-    }
-    resolvedModel = resolved.model;
-    thinkingLevel = resolved.thinkingLevel;
-    isReadOnly = createReadOnlyChecker(readOnlyPolicy);
+    config = loadConfig();
+    initializeAudit(config, ctx);
   });
 
   pi.on("tool_call", async (event, ctx) => {
     if (!isToolCallEventType("bash", event)) return;
-    if (!resolvedModel) return;
 
     const command = event.input.command;
-    if (!command || isReadOnly(command)) return;
+    if (!command) return;
+
+    const action = evaluateScript(command);
+    logger.info("evaluate", { cwd: ctx.cwd, command, action, modelAvailable: Boolean(resolvedModel) });
+
+    if (action === "allow") return;
+
+    if (action === "prompt") {
+      const proceed = await confirmWithScrollableMessage(
+        ctx,
+        "This command requires confirmation by rule.",
+        `Command:\n${command}\n\nExecute anyway?`,
+      );
+      return proceed ? undefined : { block: true, reason: "bash-audit: confirmation declined" };
+    }
+
+    if (!resolvedModel) {
+      const proceed = await confirmWithScrollableMessage(
+        ctx,
+        "No audit model is available.",
+        `Command:\n${command}\n\nExecute anyway?`,
+      );
+      return proceed ? undefined : { block: true, reason: "bash-audit: confirmation declined" };
+    }
 
     const result = await auditCommand({
       ctx,
@@ -153,25 +166,25 @@ export default function (pi: ExtensionAPI) {
     });
 
     if (result.kind === "aborted") {
-      return { block: true, reason: "bash-audit aborted by user" };
+      return { block: true, reason: "bash-audit: aborted by user" };
     }
 
     if (result.kind === "failed") {
       const proceed = await confirmWithScrollableMessage(
         ctx,
-        "Bash audit failed",
-        `Audit could not complete: ${result.reason}\n\nCommand:\n${command}\n\nExecute anyway?`,
+        `Audit failed: ${result.reason}`,
+        `Command:\n${command}\n\nExecute anyway?`,
       );
-      return proceed ? undefined : { block: true, reason: `bash-audit failed: ${result.reason}` };
+      return proceed ? undefined : { block: true, reason: "bash-audit: confirmation declined" };
     }
 
     if (result.risk === "high") {
       const proceed = await confirmWithScrollableMessage(
         ctx,
-        "High-risk bash command",
-        `Reason: ${result.reason}\n\nCommand:\n${command}\n\nAllow execution?`,
+        `High-risk command: ${result.reason}`,
+        `Command:\n${command}\n\nAllow execution?`,
       );
-      return proceed ? undefined : { block: true, reason: `bash-audit: high risk - ${result.reason}` };
+      return proceed ? undefined : { block: true, reason: "bash-audit: confirmation declined" };
     }
 
     pi.appendEntry<AuditEntryData>(ENTRY_TYPE, {
@@ -182,13 +195,15 @@ export default function (pi: ExtensionAPI) {
 }
 
 /** confirmWithScrollableMessage displays a half-height, scrollable confirmation prompt in TUI mode. */
-function confirmWithScrollableMessage(ctx: ExtensionContext, title: string, message: string): Promise<boolean> {
-  if (ctx.mode !== "tui") return ctx.ui.confirm(title, message);
+function confirmWithScrollableMessage(ctx: ExtensionContext, reason: string, message: string): Promise<boolean> {
+  const title = "Bash command confirmation";
+  const content = `${reason}\n\n${message}`;
+  if (ctx.mode !== "tui") return ctx.ui.confirm(title, content);
 
   return ctx.ui.custom<boolean>((tui, theme, keybindings, done) => {
     const selector = new ScrollableSelectorComponent(
       title,
-      message,
+      content,
       ["Yes", "No"],
       (selected) => done(selected === "Yes"),
       () => done(false),

@@ -13,38 +13,64 @@ import {
 
 import { isReadOnlyCommand } from "./read-only";
 
-export interface ReadOnlyPolicy {
-  isReadOnlyCommand(command: string, args: readonly string[]): boolean;
+export type Action = "allow" | "prompt" | "auto";
+
+export interface CommandPolicy {
+  evaluate(command: string, args: readonly string[]): Action;
 }
 
-export const defaultPolicy = { isReadOnlyCommand };
+export const defaultPolicy: CommandPolicy = {
+  evaluate(command, args) {
+    return isReadOnlyCommand(command, args) ? "allow" : "auto";
+  },
+};
 
-export function createReadOnlyChecker(policy: ReadOnlyPolicy): (source: string) => boolean {
-  function isReadOnlyScript(script: Script): boolean {
-    return script.commands.every(isReadOnlyNode);
+const actionPriority: Record<Action, number> = { allow: 0, auto: 1, prompt: 2 };
+
+/** Returns the strictest action from a set of command evaluations. */
+function combineActions(actions: readonly Action[]): Action {
+  // prettier-ignore
+  return actions.reduce((result, action) => (actionPriority[action] > actionPriority[result] ? action : result), "allow");
+}
+
+/** Downgrades an allowed action unless the surrounding syntax is safe for direct execution. */
+function restrictAllow(action: Action, isSafeForAllow: boolean): Action {
+  if (action !== "allow") return action;
+  if (isSafeForAllow) return "allow";
+  return "auto";
+}
+
+export function createScriptEvaluator(policy: CommandPolicy): (source: string) => Action {
+  function evaluateScript(script: Script): Action {
+    return combineActions(script.commands.map(evaluateNode));
   }
 
-  function isReadOnlyNode(node: Node): boolean {
+  function evaluateNode(node: Node): Action {
     switch (node.type) {
       case "Statement":
-        return !node.background && areReadOnlyRedirects(node.redirects) && isReadOnlyNode(node.command);
+        // 后台执行与非只读重定向会使本来只读的命令产生不可控行为。
+        return restrictAllow(evaluateNode(node.command), !node.background && areReadOnlyRedirects(node.redirects));
       case "Command":
-        return isReadOnlySimpleCommand(node);
+        return evaluateSimpleCommand(node);
       case "Pipeline":
       case "AndOr":
-        return node.commands.length > 0 && node.commands.every(isReadOnlyNode);
+        return node.commands.length > 0 ? combineActions(node.commands.map(evaluateNode)) : "auto";
       case "If":
-        return isReadOnlyNode(node.clause) && isReadOnlyNode(node.then) && (!node.else || isReadOnlyNode(node.else));
+        return combineActions([
+          evaluateNode(node.clause),
+          evaluateNode(node.then),
+          ...(node.else ? [evaluateNode(node.else)] : []),
+        ]);
       case "Subshell":
       case "BraceGroup":
-        return isReadOnlyNode(node.body);
+        return evaluateNode(node.body);
       case "CompoundList":
-        return node.commands.every(isReadOnlyNode);
+        return combineActions(node.commands.map(evaluateNode));
       case "Case":
-        return isReadOnlyCase(node);
+        return evaluateCase(node);
       case "TestCommand":
-        return isStaticTestExpression(node.expression);
-      // 循环、函数、协程、算术命令天然会引入变量绑定或迭代副作用，一律拒绝。
+        return isStaticTestExpression(node.expression) ? "allow" : "auto";
+      // 循环、函数、协程、算术命令会引入运行时行为，无法可靠匹配。
       case "For":
       case "ArithmeticFor":
       case "Select":
@@ -52,44 +78,43 @@ export function createReadOnlyChecker(policy: ReadOnlyPolicy): (source: string) 
       case "Function":
       case "Coproc":
       case "ArithmeticCommand":
-        return false;
+        return "auto";
     }
   }
 
-  function isReadOnlySimpleCommand(node: Command): boolean {
-    if (node.prefix.length > 0) return false;
-    if (!node.name || !isStaticWord(node.name)) return false;
-    if (!node.suffix.every(isStaticWord)) return false;
-    if (!areReadOnlyRedirects(node.redirects)) return false;
+  function evaluateSimpleCommand(node: Command): Action {
+    if (node.prefix.length > 0 || !node.name || !isStaticWord(node.name) || !node.suffix.every(isStaticWord)) {
+      return "auto";
+    }
 
-    return policy.isReadOnlyCommand(
+    const action = policy.evaluate(
       node.name.value,
       node.suffix.map((word) => word.value),
     );
+    // 策略只判断命令和参数；重定向必须额外确认不会读取动态内容或写入文件。
+    return restrictAllow(action, areReadOnlyRedirects(node.redirects));
   }
 
-  function isReadOnlyCase(node: Case): boolean {
-    if (!isStaticWord(node.word)) return false;
-    return node.items.every((item) => item.pattern.every(isStaticCasePattern) && isReadOnlyNode(item.body));
+  function evaluateCase(node: Case): Action {
+    if (!isStaticWord(node.word)) return "auto";
+    return combineActions(
+      node.items.map((item) => {
+        // case 模式会在分支选择前展开；即使分支体只读，动态模式也可能产生副作用。
+        return restrictAllow(evaluateNode(item.body), item.pattern.every(isStaticCasePattern));
+      }),
+    );
   }
 
-  return (source: string): boolean => {
-    if (!source.trim()) return false;
+  return (source: string): Action => {
+    if (!source.trim()) return "auto";
 
     try {
       const script = parse(source);
-      return !script.errors?.length && script.commands.length > 0 && isReadOnlyScript(script);
+      return !script.errors?.length && script.commands.length > 0 ? evaluateScript(script) : "auto";
     } catch {
-      return false;
+      return "auto";
     }
   };
-}
-
-const defaultChecker = createReadOnlyChecker(defaultPolicy);
-
-// false means "not proven read-only"; callers must send it through LLM review.
-export function isReadOnly(source: string): boolean {
-  return defaultChecker(source);
 }
 
 // 允许的重定向：

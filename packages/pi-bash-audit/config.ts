@@ -13,17 +13,18 @@ const readOnlyExceptionSchema = z.object({
   args: z.array(z.string().trim().min(1)).min(1),
 });
 
-const readOnlyRuleSchema = z.object({
+const ruleSchema = z.object({
   command: z.string().trim().min(1),
   args: z.array(z.string().trim().min(1)).default([]),
   except: z.array(readOnlyExceptionSchema).default([]),
+  action: z.enum(["allow", "prompt", "auto"]),
 });
 
-export type ReadOnlyRule = z.infer<typeof readOnlyRuleSchema>;
+export type Rule = z.infer<typeof ruleSchema>;
 
 export const bashAuditConfigSchema = modelSchema.extend({
-  enable: z.boolean().default(true),
-  readOnlyRules: z.array(readOnlyRuleSchema).default([]),
+  enable: z.boolean().default(false),
+  rules: z.array(ruleSchema).default([]),
 });
 
 export type BashAuditConfig = z.infer<typeof bashAuditConfigSchema>;

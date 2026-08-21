@@ -182,50 +182,29 @@ Project definitions require a trusted project. Name conflicts are resolved in th
 
 ### Bash Audit (`pi-bash-audit`)
 
-**Usage:** Disabled by default. Run `/audit` to search the available models, select a supported thinking level, and enable auditing immediately. Read-only commands then run directly; other `bash` tool calls are classified as `low`, `medium`, or `high` risk. Low- and medium-risk commands show notifications, while high-risk commands and audit failures require confirmation.
+**Usage:** Disabled by default. In TUI mode, run `/audit`, then select a model and reasoning level. The extension lets recognised read-only commands run directly and uses the selected model to assess other commands. High-risk commands, unavailable models, and failed audits require your confirmation before execution.
 
-**Configuration:** `/audit` saves `~/.pi/agent/extensions/bash-audit.json`. To configure it manually, create the file with:
+**Configuration:** `/audit` creates `~/.pi/agent/extensions/bash-audit.json`. To configure it yourself, create or edit the file:
 
 ```json
 {
   "enable": true,
   "model": "openai/gpt-4o-mini",
-  "thinkingLevel": "off"
+  "thinkingLevel": "off",
+  "rules": [
+    { "command": "git", "args": ["log"], "action": "allow" },
+    { "command": "git", "args": ["push"], "action": "prompt" }
+  ]
 }
 ```
 
-- `enable` — optional; defaults to `true`. Set it to `false` to disable auditing while keeping the configuration.
-- `model` — required to enable auditing, in `provider/model` format.
-- `thinkingLevel` — optional; `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`.
-- `readOnlyRules` — optional; custom read-only allowlist applied on top of the built-in one (`cat`, `ls`, `git status`, etc.). Each rule has:
-  - `command` — must match the command name exactly.
-  - `args` — pattern array matched against the full argument list:
-    - a literal matches one argument exactly;
-    - a glob with `*` matches any content within a single argument;
-    - `**` as a standalone element absorbs any number of arguments (including none);
-    - `/regex/` full-matches a single argument;
-    - if every element is a literal, the rule behaves as a prefix match (equivalent to appending `**`).
-  - `except` — optional; if any entry's `args` patterns match, the rule is vetoed (same syntax as `args`).
-
-  Example:
-
-  ```json
-  {
-    "enable": true,
-    "model": "openai/gpt-4o-mini",
-    "readOnlyRules": [
-      { "command": "git", "args": ["log", "**"] },
-      { "command": "npm", "args": ["run", "*"] },
-      { "command": "docker", "args": ["image", "ls", "**"] },
-      { "command": "uv", "args": ["/sync|check/"] },
-      {
-        "command": "pnpm",
-        "args": ["run", "**"],
-        "except": [{ "args": ["run", "deploy"] }]
-      }
-    ]
-  }
-  ```
+- `enable` — optional; set to `false` to turn auditing off without deleting the configuration.
+- `model` — required when auditing is enabled; use `provider/model` format.
+- `thinkingLevel` — optional reasoning level supported by the selected model.
+- `rules` — optional ordered overrides; the first matching rule applies.
+  - `command` matches the command name and `args` matches its arguments. Literal arguments match a prefix; use `*` within one argument, `**` for any number of arguments, or `/regex/` for a full argument match.
+  - `action` can be `allow` (run directly), `prompt` (always ask), or `auto` (ask the audit model).
+  - `except` optionally excludes argument patterns from a rule.
 
 ### Session Tips (`pi-tips`)
 

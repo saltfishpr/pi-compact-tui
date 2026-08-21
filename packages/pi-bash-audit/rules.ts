@@ -1,5 +1,5 @@
-import type { ReadOnlyRule } from "./config";
-import type { ReadOnlyPolicy } from "./shell";
+import type { Rule } from "./config";
+import type { Action, CommandPolicy } from "./shell";
 
 type ArgumentPattern =
   | { kind: "any" }
@@ -10,34 +10,38 @@ type CompiledRule = {
   command: string;
   args: readonly ArgumentPattern[];
   except: readonly (readonly ArgumentPattern[])[];
+  action: Action;
 };
 
 /**
- * createRulePolicy compiles configured read-only rules into a command policy.
+ * createRulePolicy compiles configured rules into a command policy.
  * Invalid regular expressions throw immediately so a malformed configuration never widens the allowlist.
  */
-export function createRulePolicy(rules: readonly ReadOnlyRule[]): ReadOnlyPolicy {
+export function createRulePolicy(rules: readonly Rule[], fallback: CommandPolicy): CommandPolicy {
   const compiledRules = rules.map(compileRule);
 
   return {
-    isReadOnlyCommand(command, args) {
-      return compiledRules.some(
+    evaluate(command, args) {
+      const rule = compiledRules.find(
         (rule) =>
           rule.command === command &&
           matches(rule.args, args) &&
           !rule.except.some((exception) => matches(exception, args)),
       );
+      if (rule) return rule.action;
+      return fallback.evaluate(command, args);
     },
   };
 }
 
-function compileRule(rule: ReadOnlyRule, ruleIndex: number): CompiledRule {
+function compileRule(rule: Rule, ruleIndex: number): CompiledRule {
   return {
     command: rule.command,
-    args: compilePatterns(rule.args, `readOnlyRules[${ruleIndex}].args`),
+    args: compilePatterns(rule.args, `rules[${ruleIndex}].args`),
     except: rule.except.map((exception, exceptionIndex) =>
-      compilePatterns(exception.args, `readOnlyRules[${ruleIndex}].except[${exceptionIndex}].args`),
+      compilePatterns(exception.args, `rules[${ruleIndex}].except[${exceptionIndex}].args`),
     ),
+    action: rule.action,
   };
 }
 

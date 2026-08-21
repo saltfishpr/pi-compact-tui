@@ -1,84 +1,80 @@
 import { describe, expect, it } from "vitest";
 
+import type { Rule } from "./config";
+import type { CommandPolicy } from "./shell";
 import { createRulePolicy } from "./rules";
 
+const fallback: CommandPolicy = {
+  evaluate: () => "auto",
+};
+
+function evaluate(rules: readonly Rule[], command: string, args: readonly string[]): string {
+  return createRulePolicy(rules, fallback).evaluate(command, args);
+}
+
 describe("createRulePolicy", () => {
-  it("rejects commands not covered by a rule", () => {
-    const policy = createRulePolicy([]);
+  it("matches commands and literal argument prefixes", () => {
+    const rules: Rule[] = [{ command: "git", args: ["status"], except: [], action: "allow" }];
 
-    expect(policy.isReadOnlyCommand("git", ["status"])).toBe(false);
+    expect(evaluate(rules, "git", ["status"])).toBe("allow");
+    expect(evaluate(rules, "git", ["status", "--short"])).toBe("allow");
+    expect(evaluate(rules, "git", ["log"])).toBe("auto");
+    expect(evaluate(rules, "rg", ["status"])).toBe("auto");
   });
 
-  describe("literal patterns", () => {
-    const policy = createRulePolicy([
-      { command: "git", args: ["status"], except: [] },
-    ]);
+  it("matches glob, regular expression, and ** patterns", () => {
+    const rules: Rule[] = [
+      { command: "cat", args: ["*.md"], except: [], action: "allow" },
+      { command: "git", args: ["/show|diff/", "**", "--stat"], except: [], action: "prompt" },
+    ];
 
-    it("matches the configured command and literal argument prefix", () => {
-      expect(policy.isReadOnlyCommand("git", ["status"])).toBe(true);
-      expect(policy.isReadOnlyCommand("git", ["status", "--short"])).toBe(true);
-    });
-
-    it("rejects a different command or literal prefix", () => {
-      expect(policy.isReadOnlyCommand("hg", ["status"])).toBe(false);
-      expect(policy.isReadOnlyCommand("git", [])).toBe(false);
-      expect(policy.isReadOnlyCommand("git", ["log"])).toBe(false);
-    });
+    expect(evaluate(rules, "cat", ["README.md"])).toBe("allow");
+    expect(evaluate(rules, "cat", ["README.mdx"])).toBe("auto");
+    expect(evaluate(rules, "git", ["show", "HEAD", "--stat"])).toBe("prompt");
+    expect(evaluate(rules, "git", ["diff", "--stat"])).toBe("prompt");
+    expect(evaluate(rules, "git", ["log", "--stat"])).toBe("auto");
   });
 
-  describe("wildcard patterns", () => {
-    it("matches globs against one argument", () => {
-      const policy = createRulePolicy([
-        { command: "npm", args: ["run", "build-*"], except: [] },
-      ]);
-
-      expect(policy.isReadOnlyCommand("npm", ["run", "build-web"])).toBe(true);
-      expect(policy.isReadOnlyCommand("npm", ["run", "build"])).toBe(false);
-      expect(policy.isReadOnlyCommand("npm", ["run", "build-web", "--watch"])).toBe(false);
-    });
-
-    it("lets ** absorb zero or more arguments", () => {
-      const policy = createRulePolicy([
-        { command: "git", args: ["--no-pager", "**", "log"], except: [] },
-      ]);
-
-      expect(policy.isReadOnlyCommand("git", ["--no-pager", "log"])).toBe(true);
-      expect(policy.isReadOnlyCommand("git", ["--no-pager", "-c", "color.ui=never", "log"])).toBe(true);
-      expect(policy.isReadOnlyCommand("git", ["--no-pager", "log", "--oneline"])).toBe(false);
-    });
-  });
-
-  describe("regular expression patterns", () => {
-    it("matches the complete argument", () => {
-      const policy = createRulePolicy([
-        { command: "uv", args: ["/sync|check/"], except: [] },
-      ]);
-
-      expect(policy.isReadOnlyCommand("uv", ["sync"])).toBe(true);
-      expect(policy.isReadOnlyCommand("uv", ["check"])).toBe(true);
-      expect(policy.isReadOnlyCommand("uv", ["sync-all"])).toBe(false);
-    });
-
-    it("reports the configuration location for invalid regular expressions", () => {
-      expect(() =>
-        createRulePolicy([{ command: "uv", args: ["/[a-/"], except: [] }]),
-      ).toThrow("Invalid regular expression at readOnlyRules[0].args[0]");
-    });
-  });
-
-  describe("exceptions", () => {
-    it("rejects an allowed rule when an exception matches", () => {
-      const policy = createRulePolicy([
+  it("uses the fallback when no rule applies or an exception matches", () => {
+    const fallbackPolicy: CommandPolicy = {
+      evaluate: (command, args) => (command === "git" && args[0] === "push" ? "prompt" : "auto"),
+    };
+    const policy = createRulePolicy(
+      [
         {
-          command: "pnpm",
-          args: ["run", "**"],
-          except: [{ args: ["run", "deploy"] }],
+          command: "git",
+          args: ["push", "**"],
+          except: [{ args: ["push", "origin", "main"] }],
+          action: "allow",
         },
-      ]);
+      ],
+      fallbackPolicy,
+    );
 
-      expect(policy.isReadOnlyCommand("pnpm", ["run", "test"])).toBe(true);
-      expect(policy.isReadOnlyCommand("pnpm", ["run", "deploy"])).toBe(false);
-      expect(policy.isReadOnlyCommand("pnpm", ["run", "deploy", "--prod"])).toBe(false);
-    });
+    expect(policy.evaluate("git", ["push", "origin", "feature"])).toBe("allow");
+    expect(policy.evaluate("git", ["push", "origin", "main"])).toBe("prompt");
+    expect(policy.evaluate("git", ["status"])).toBe("auto");
+  });
+
+  it("uses the first matching rule", () => {
+    const rules: Rule[] = [
+      { command: "git", args: ["**"], except: [], action: "prompt" },
+      { command: "git", args: ["status"], except: [], action: "allow" },
+    ];
+
+    expect(evaluate(rules, "git", ["status"])).toBe("prompt");
+  });
+
+  it.each([
+    [
+      [{ command: "git", args: ["/[/"], except: [], action: "allow" }],
+      "rules[0].args[0]",
+    ],
+    [
+      [{ command: "git", args: [], except: [{ args: ["/(/" ] }], action: "allow" }],
+      "rules[0].except[0].args[0]",
+    ],
+  ] satisfies [Rule[], string][])('rejects invalid regular expressions at %s', (rules, location) => {
+    expect(() => createRulePolicy(rules, fallback)).toThrow(`Invalid regular expression at ${location}`);
   });
 });

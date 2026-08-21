@@ -182,50 +182,29 @@ effort: high
 
 ### Bash 审计（`pi-bash-audit`）
 
-**使用方法：** 默认关闭。运行 `/audit`，搜索可用模型并选择该模型支持的推理档位，即可立即启用审计。启用后，只读命令会直接执行；其他 `bash` 工具调用会被判定为 `low`、`medium` 或 `high` 风险。低、中风险仅展示通知，高风险和审计失败会要求确认。
+**使用方法：** 默认关闭。在 TUI 模式执行 `/audit`，选择模型和推理档位即可启用。插件会直接执行已识别的只读命令，并使用所选模型评估其他命令。高风险命令、模型不可用或审计失败时，均须确认后才会执行。
 
-**配置：** `/audit` 会保存 `~/.pi/agent/extensions/bash-audit.json`。如需手工配置，创建该文件并写入：
+**配置：** `/audit` 会创建 `~/.pi/agent/extensions/bash-audit.json`。也可手动创建或编辑该文件：
 
 ```json
 {
   "enable": true,
   "model": "openai/gpt-4o-mini",
-  "thinkingLevel": "off"
+  "thinkingLevel": "off",
+  "rules": [
+    { "command": "git", "args": ["log"], "action": "allow" },
+    { "command": "git", "args": ["push"], "action": "prompt" }
+  ]
 }
 ```
 
-- `enable` — 可选，默认为 `true`；设为 `false` 可在保留配置的同时关闭审计。
-- `model` — 启用审计所必需，格式为 `provider/model`。
-- `thinkingLevel` — 可选，可设为 `off`、`minimal`、`low`、`medium`、`high`、`xhigh` 或 `max`。
-- `readOnlyRules` — 可选，自定义只读白名单，在内置白名单（`cat`、`ls`、`git status` 等）之上追加。每条规则：
-  - `command` — 必须与命令名逐字一致；
-  - `args` — 参数模式数组，与完整参数列表匹配：
-    - 字面量：与对应参数逐字相等；
-    - 含 `*` 的 glob：匹配单个参数内的任意内容；
-    - 独立元素 `**`：吸收任意数量（含 0 个）参数；
-    - `/正则/`：对单个参数做全匹配；
-    - 若 `args` 全为字面量，按前缀匹配处理（等价于末尾追加 `**`）。
-  - `except` — 可选，任一 `args` 模式命中即否决该规则（语法同上）。
-
-  示例：
-
-  ```json
-  {
-    "enable": true,
-    "model": "openai/gpt-4o-mini",
-    "readOnlyRules": [
-      { "command": "git", "args": ["log", "**"] },
-      { "command": "npm", "args": ["run", "*"] },
-      { "command": "docker", "args": ["image", "ls", "**"] },
-      { "command": "uv", "args": ["/sync|check/"] },
-      {
-        "command": "pnpm",
-        "args": ["run", "**"],
-        "except": [{ "args": ["run", "deploy"] }]
-      }
-    ]
-  }
-  ```
+- `enable` — 可选；设为 `false` 可关闭审计，同时保留配置。
+- `model` — 启用审计时必填，格式为 `provider/model`。
+- `thinkingLevel` — 可选，使用所选模型支持的推理档位。
+- `rules` — 可选的有序覆盖规则，采用第一条匹配的规则。
+  - `command` 匹配命令名，`args` 匹配参数。字面量按前缀匹配；`*` 匹配单个参数中的任意内容，`**` 匹配任意数量参数，`/正则/` 对单个参数进行全匹配。
+  - `action` 可设为 `allow`（直接执行）、`prompt`（始终确认）或 `auto`（交由审计模型判断）。
+  - `except` 可选，用于排除不适用当前规则的参数模式。
 
 ### 会话小贴士（`pi-tips`）
 
