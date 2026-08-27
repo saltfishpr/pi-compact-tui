@@ -2,7 +2,7 @@
   "tip.label": "提示",
   "tip.fork": "使用 /fork 可以从当前会话分叉出一条新分支，方便探索不同方案。",
   "tip.model": "按 Ctrl+P 或运行 /model 可在会话中途切换模型。",
-  "tip.thinking": "按 Shift+Tab 可循环切换推理档位（off -> minimal -> low -> medium -> high）。",
+  "tip.thinking": "按 Shift+Tab 循环切换推理档位（off -> minimal -> low -> medium -> high -> xhigh -> max），或运行 /thinking 直接选择。",
   "tip.tree": "运行 /tree 可以浏览当前会话的分支历史。",
   "tip.name": "运行 /name <名称> 可以给当前会话命名，方便下次 /resume 查找。",
   "tip.reload": "修改扩展、subagent 或 skill 后，运行 /reload 即可热加载。",
@@ -13,5 +13,9 @@
   "tip.trustGit": "配置 ~/.pi/agent/extensions/trust.json 可按 Git origin 自动信任项目。",
   "tip.footer": "编辑 ~/.pi/agent/extensions/footer.json 可自定义底部状态栏布局。",
   "tip.subagent": "让 Pi \"使用 planner subagent\" 可基于当前代码库产出一份实现计划。",
-  "tip.bashAudit": "运行 /audit 选择模型并启用 LLM 驱动的 bash 命令安全审计。"
+  "tip.bashAudit": "运行 /audit 选择模型并启用 LLM 驱动的 bash 命令安全审计。",
+  "tip.copyMessage": "按 Ctrl+X 可复制最后一条助手消息，或在 /tree 中复制选中的消息。",
+  "tip.fullscreen": "使用 --tui-mode fullscreen 启动或在 /settings 中切换全屏模式；Ctrl+Shift+F 可搜索历史输出。",
+  "tip.saveDefault": "模型选择器中按 Ctrl+S 可把当前高亮模型保存为全局默认。",
+  "tip.overrideContext": "在子目录放置 AGENTS.override.md 即可替换该目录下继承的 AGENTS.md。"
 }
