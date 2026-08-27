@@ -48,7 +48,7 @@ function formatUsage(theme: Theme, usage: CodexUsageResponse): string {
     return theme.fg("success", text);
   });
 
-  return values.join(" • ");
+  return values.join(theme.fg("dim", " • "));
 }
 
 function buildHeaders(apiKey: string): Record<string, string> {
