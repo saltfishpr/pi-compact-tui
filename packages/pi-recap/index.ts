@@ -51,6 +51,11 @@ export default function (pi: ExtensionAPI) {
     idleListener?.watch(ctx);
   });
 
+  // 压缩失败或中止时同样恢复 idle 监听，避免 recap 卡在等待重生成的状态。
+  pi.on("session_compact_failed", (_event, ctx) => {
+    idleListener?.watch(ctx);
+  });
+
   pi.on("session_tree", (_event, ctx) => {
     idleListener?.watch(ctx);
   });
