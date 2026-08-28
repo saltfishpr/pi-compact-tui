@@ -36,7 +36,8 @@
       "./packages/pi-recap/index.ts",
       "./packages/pi-subagent/index.ts",
       "./packages/pi-tips/index.ts",
-      "./packages/pi-trust-git/index.ts"
+      "./packages/pi-trust-git/index.ts",
+      "./packages/pi-zai-stats/index.ts"
     ],
     "image": "https://raw.githubusercontent.com/saltfishpr/pi-compact-tui/refs/heads/master/assets/recap.png"
   },

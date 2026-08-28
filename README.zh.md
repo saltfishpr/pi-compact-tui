@@ -87,6 +87,12 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 
 支持 `CNY` 和 `USD`。紧凑页脚需包含 `extensionStatuses` 或 `status:deepseek-stats` 才会显示该状态。
 
+### Z.ai 用量状态（`pi-zai-stats`）
+
+**使用方法：** 选择 `zai-coding-cn` 模型后，页脚会显示今日用量、当前会话用量和账户余额。
+
+**配置：** 先在 Pi 中配置智谱 API Key，无需插件专用配置文件。紧凑页脚需包含 `extensionStatuses` 或 `status:zai-stats` 才会显示该状态。
+
 ### 输入历史（`pi-history`）
 
 **使用方法：** 按 `shift+↑` 找回之前提交的输入，按 `shift+↓` 向后移动或恢复当前草稿。历史记录会跨会话保留。

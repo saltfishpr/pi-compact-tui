@@ -87,6 +87,12 @@ Each bundled extension works immediately after installation unless its section s
 
 Supported values are `CNY` and `USD`. The compact footer must include `extensionStatuses` or `status:deepseek-stats` to display the value.
 
+### Z.ai Usage Status (`pi-zai-stats`)
+
+**Usage:** Select a `zai-coding-cn` model. The footer shows today's usage, session usage, and current account balance.
+
+**Configuration:** Configure your Zhipu API key in Pi. No extension-specific file is required. The compact footer must include `extensionStatuses` or `status:zai-stats` to display the value.
+
 ### Input History (`pi-history`)
 
 **Usage:** Press `shift+↑` to recall an earlier submitted input and `shift+↓` to move forward or restore the draft. History persists across sessions.
