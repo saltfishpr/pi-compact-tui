@@ -11,7 +11,7 @@ import { Box, Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
 import { resolveModel, type UsageTotals } from "../pi-common";
 import { discoverAgents, type AgentDiagnostic, type AgentProfile } from "./agents";
 import { inChildSessionContext } from "./child-context";
-import { loadConfig } from "./config";
+import { loadConfig, type SubagentConfig } from "./config";
 import { formatDuration, formatUsage } from "./format";
 import { SubagentManager, type SpawnStopReason } from "./manager";
 import { createSubagentWidget } from "./widget";
@@ -44,6 +44,18 @@ function formatAvailableAgents(agents: AgentProfile[]): string {
     )
     .join("\n");
   return `<available_subagents>\n${entries}\n</available_subagents>`;
+}
+
+function applyAgentOverrides(profiles: AgentProfile[], config: SubagentConfig): AgentProfile[] {
+  return profiles.map((profile) => {
+    const override = config.agents[profile.name];
+    if (!override) return profile;
+    const merged: AgentProfile = { ...profile };
+    if (override.model !== undefined) merged.model = override.model;
+    if (override.effort !== undefined) merged.effort = override.effort;
+    if (override.maxTurns !== undefined) merged.maxTurns = override.maxTurns;
+    return merged;
+  });
 }
 
 interface AgentToolDetails {
@@ -197,7 +209,7 @@ export default function (pi: ExtensionAPI) {
     const catalog = discoverAgents(ctx.cwd, ctx.isProjectTrusted());
     reportDiagnostics(ctx, catalog.diagnostics);
     if (catalog.agents.length === 0) return;
-    agents = catalog.agents;
+    agents = applyAgentOverrides(catalog.agents, config);
 
     manager = new SubagentManager(ctx.cwd, config.maxConcurrent);
     ctx.ui.setWidget(WIDGET_KEY, createSubagentWidget(manager), { placement: "aboveEditor" });

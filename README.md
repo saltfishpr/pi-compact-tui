@@ -127,11 +127,20 @@ Use the planner subagent to inspect this project and create an implementation pl
 ```json
 {
   "enabled": true,
-  "maxConcurrent": 4
+  "maxConcurrent": 4,
+  "agents": {
+    "explore": {
+      "model": "deepseek/deepseek-chat",
+      "effort": "medium",
+      "maxTurns": 30
+    }
+  }
 }
 ```
 
 `maxConcurrent` controls how many subagents may run at once (1–32); additional calls wait in FIFO order. Subagents share the current working directory, so parallel editing tasks can conflict.
+
+Use `agents.<name>` to override an individual subagent's `model`, `effort`, or `maxTurns` without editing its Markdown definition. Any field you omit falls back to the subagent's own frontmatter.
 
 To add a custom subagent, create a Markdown file in `~/.pi/agent/agents/` for all projects or `.pi/agents/` for the current trusted project. The filename becomes the subagent name. Run `/reload` after changes.
 

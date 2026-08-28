@@ -127,11 +127,20 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 ```json
 {
   "enabled": true,
-  "maxConcurrent": 4
+  "maxConcurrent": 4,
+  "agents": {
+    "explore": {
+      "model": "deepseek/deepseek-chat",
+      "effort": "medium",
+      "maxTurns": 30
+    }
+  }
 }
 ```
 
 `maxConcurrent` 控制同时运行的子代理数量（1–32）；超出的调用按 FIFO 顺序等待。子代理与父会话共用工作目录，并行编辑任务可能发生冲突。
+
+在 `agents.<名称>` 中可覆盖单个子代理的 `model`、`effort` 或 `maxTurns`，无需修改其 Markdown 定义；未填字段沿用子代理自身的 frontmatter。
 
 如需添加自定义子代理，在 `~/.pi/agent/agents/` 中创建所有项目可用的 Markdown 文件，或在 `.pi/agents/` 中创建仅供当前已信任项目使用的文件。文件名即子代理名称；修改后执行 `/reload`。
 
