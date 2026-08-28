@@ -7,6 +7,7 @@ const PROVIDER = "deepseek";
 const STATUS_KEY = "deepseek-stats";
 const BALANCE_URL = "https://api.deepseek.com/user/balance";
 const REQUEST_TIMEOUT_MS = 30_000;
+const MIN_REFRESH_INTERVAL_MS = 10_000;
 
 interface BalanceInfo {
   currency: string;
@@ -109,6 +110,7 @@ function parseBalance(response: BalanceResponse, currency: Currency): number {
 
 export default function (pi: ExtensionAPI) {
   let inflight: AbortController | undefined;
+  let lastRefreshAt = 0;
   let sessionOpeningBalance: number | undefined;
 
   function clear(ctx: ExtensionContext): void {
@@ -122,6 +124,9 @@ export default function (pi: ExtensionAPI) {
       clear(ctx);
       return;
     }
+
+    if (Date.now() - lastRefreshAt < MIN_REFRESH_INTERVAL_MS) return;
+    lastRefreshAt = Date.now();
 
     inflight?.abort();
     const controller = new AbortController();

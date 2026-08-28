@@ -4,6 +4,7 @@ const PROVIDER = "openai-codex";
 const STATUS_KEY = "codex-stats";
 const USAGE_URL = "https://chatgpt.com/backend-api/wham/usage";
 const REQUEST_TIMEOUT_MS = 30_000;
+const MIN_REFRESH_INTERVAL_MS = 10_000;
 
 interface CodexRateWindow {
   limit_window_seconds: number;
@@ -64,6 +65,7 @@ function buildHeaders(apiKey: string): Record<string, string> {
 
 export default function (pi: ExtensionAPI) {
   let inflight: AbortController | undefined;
+  let lastRefreshAt = 0;
 
   function clear(ctx: ExtensionContext): void {
     inflight?.abort();
@@ -76,6 +78,9 @@ export default function (pi: ExtensionAPI) {
       clear(ctx);
       return;
     }
+
+    if (Date.now() - lastRefreshAt < MIN_REFRESH_INTERVAL_MS) return;
+    lastRefreshAt = Date.now();
 
     inflight?.abort();
     const controller = new AbortController();
