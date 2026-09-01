@@ -19,6 +19,7 @@ const READ_ONLY_COMMANDS = new Set([
   "head",
   "ls",
   "printenv",
+  "printf",
   "ps",
   "pwd",
   "stat",
