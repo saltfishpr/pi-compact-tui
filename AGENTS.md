@@ -12,12 +12,11 @@ This file provides guidance to AI agents when working with code in this reposito
 pi-compact-tui/
 ├── packages/
 │   ├── pi-clear-command/index.ts    # /clear 命令，等价于 /new 开启新会话
-│   ├── pi-codex-stats/index.ts      # OpenAI Codex 用量（限流窗口）状态
 │   ├── pi-compact-editor/index.ts   # 自定义编辑器（CustomEditor 子类），在输入框边框展示活动/模型/推理档位
 │   ├── pi-compact-footer/           # 多行底部状态栏（index.ts + config.ts 布局配置）
-│   ├── pi-deepseek-stats/           # DeepSeek 账户余额状态（index.ts + config.ts 货币配置）
 │   ├── pi-history/index.ts          # 输入历史，shift+↑/↓ 检索，跨会话持久化
 │   ├── pi-provider-ark/index.ts     # 注册 ark-coding-plan provider（火山方舟 Coding Plan）
+│   ├── pi-usage-stats/              # 各 provider 的订阅限流与账户余额状态
 │   └── pi-trust-git/index.ts        # 按 origin 远程的域名/用户名规则自动信任项目
 ├── package.json                     # pi package 清单 + workspace 配置
 ├── pnpm-workspace.yaml
@@ -40,11 +39,7 @@ pi-compact-tui/
 
 ## 配置文件约定
 
-用户态配置统一位于 `~/.pi/agent/extensions/`：
-
-- `footer.json` — 底部状态栏布局（行、左右位置、分隔符）
-- `deepseek-stats.json` — DeepSeek 余额货币（`CNY` / `USD`）
-- `trust.json` — Git 自动信任的域名/用户名白名单
+用户态配置统一位于 `~/.pi/agent/extensions/` 目录下
 
 ## 如何新增 Extension
 

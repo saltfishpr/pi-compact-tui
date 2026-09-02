@@ -24,7 +24,7 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 | ------------ | ------------------------------------------------------------------------------------------------------ |
 | 紧凑编辑器   | 在输入框边框中显示当前工作状态、模型和推理级别，减少额外界面占用。                                     |
 | 多行页脚     | 集中显示项目路径、Git 分支、会话、token、费用、上下文和其他扩展状态。                                  |
-| 用量状态     | 使用 OpenAI Codex 或 DeepSeek 时，在页脚查看限流额度或账户余额。                                       |
+| 用量状态     | 使用 OpenAI Codex、DeepSeek 或 Z.ai 时，在页脚查看订阅限流额度或账户余额。                            |
 | 输入历史     | 使用 `shift+↑` / `shift+↓` 找回之前提交的输入；记录会跨会话保留。                                      |
 | 快速新会话   | 使用 `/clear` 立即开始新会话，效果与 `/new` 相同。                                                     |
 | Git 自动信任 | 根据 `origin` 远程地址中的域名或用户名，自动信任符合规则的项目。                                       |
@@ -65,33 +65,28 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 - `separator` — 各可见元素之间的分隔文本。
 - `lines` — 页脚行；每行可包含 `left` 和 `right` 元素数组。
 - 内置元素：`pwd`、`branch`、`sessionName`、`inputTokens`、`outputTokens`、`cacheReadTokens`、`cacheWriteTokens`、`cacheHitRate`、`cost`、`context`、`provider`、`model`、`thinkingLevel` 和 `extensionStatuses`。
-- 使用 `status:<key>` 可单独放置插件状态，例如 `status:codex-stats` 或 `status:deepseek-stats`。
+- 使用 `status:<key>` 可单独放置插件状态，例如 `status:codex-stats`、`status:deepseek-stats` 或 `status:zai-stats`。
 
-### Codex 用量状态（`pi-codex-stats`）
+### 用量状态（`pi-usage-stats`）
 
-**使用方法：** 选择 `openai-codex` 模型后，插件会展示各限流窗口的剩余百分比，并在使用过程中自动刷新。
+**使用方法：** 插件会为当前选择的 provider 展示状态，并在使用过程中自动刷新：
 
-**配置：** 在 Pi 中配置 OpenAI Codex 凭据，无需插件专用配置文件。紧凑页脚需包含 `extensionStatuses` 或 `status:codex-stats` 才会显示该状态。
+- `openai-codex`：各订阅限流窗口的剩余百分比。
+- `deepseek`：今日用量、当前会话用量和账户余额。
+- `zai-coding-cn`：今日用量、当前会话用量和账户余额。
 
-### DeepSeek 用量状态（`pi-deepseek-stats`）
-
-**使用方法：** 选择 `deepseek` 模型后，页脚会显示今日用量、当前会话用量和账户余额。
-
-**配置：** 先在 Pi 中配置 DeepSeek API Key。通过生成的 `~/.pi/agent/extensions/deepseek-stats.json` 选择显示币种：
+**配置：** 先在 Pi 中配置 provider 凭据。插件会生成 `~/.pi/agent/extensions/provider-stats.json`；默认启用全部已支持的 provider：
 
 ```json
 {
-  "currency": "CNY"
+  "providers": {
+    "deepseek": { "currency": "USD" },
+    "zai-coding-cn": { "enabled": false }
+  }
 }
 ```
 
-支持 `CNY` 和 `USD`。紧凑页脚需包含 `extensionStatuses` 或 `status:deepseek-stats` 才会显示该状态。
-
-### Z.ai 用量状态（`pi-zai-stats`）
-
-**使用方法：** 选择 `zai-coding-cn` 模型后，页脚会显示今日用量、当前会话用量和账户余额。
-
-**配置：** 先在 Pi 中配置智谱 API Key，无需插件专用配置文件。紧凑页脚需包含 `extensionStatuses` 或 `status:zai-stats` 才会显示该状态。
+`enabled` 默认值为 `true`。DeepSeek 可通过 `currency` 选择 `CNY` 或 `USD`；Z.ai 固定展示 CNY。紧凑页脚需包含 `extensionStatuses`，或对应 provider 的稳定状态 key：`status:codex-stats`、`status:deepseek-stats`、`status:zai-stats`。
 
 ### 输入历史（`pi-history`）
 

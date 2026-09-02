@@ -24,7 +24,7 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | Compact editor      | Displays the current activity, model, and reasoning level in the input box border, reducing extra UI clutter.                                |
 | Multi-line footer   | Shows the project path, Git branch, session, tokens, cost, context, and other extension statuses in one place.                               |
-| Usage status        | Shows rate limits or account balance in the footer when using OpenAI Codex or DeepSeek.                                                      |
+| Usage status        | Shows subscription limits or account balance in the footer for OpenAI Codex, DeepSeek, and Z.ai.                                             |
 | Input history       | Use `shift+↑` / `shift+↓` to retrieve previously submitted inputs. History persists across sessions.                                         |
 | Quick new session   | Use `/clear` to start a new session immediately, just like `/new`.                                                                           |
 | Automatic Git trust | Automatically trusts projects that match rules based on the domain or username in the `origin` remote URL.                                   |
@@ -65,33 +65,28 @@ Each bundled extension works immediately after installation unless its section s
 - `separator` — text inserted between visible elements.
 - `lines` — footer rows, each with optional `left` and `right` element arrays.
 - Built-in elements: `pwd`, `branch`, `sessionName`, `inputTokens`, `outputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `cacheHitRate`, `cost`, `context`, `provider`, `model`, `thinkingLevel`, and `extensionStatuses`.
-- Use `status:<key>` to place one extension status explicitly, such as `status:codex-stats` or `status:deepseek-stats`.
+- Use `status:<key>` to place one extension status explicitly, such as `status:codex-stats`, `status:deepseek-stats`, or `status:zai-stats`.
 
-### Codex Usage Status (`pi-codex-stats`)
+### Usage Status (`pi-usage-stats`)
 
-**Usage:** Select an `openai-codex` model. The extension displays the remaining percentage for each Codex rate-limit window and refreshes it as you work.
+**Usage:** The extension displays a status for the selected provider and refreshes it as you work:
 
-**Configuration:** Configure your OpenAI Codex credentials in Pi. No extension-specific file is required. The compact footer must include `extensionStatuses` or `status:codex-stats` to display the value.
+- `openai-codex`: remaining percentage for each subscription rate-limit window.
+- `deepseek`: today's usage, session usage, and account balance.
+- `zai-coding-cn`: today's usage, session usage, and account balance.
 
-### DeepSeek Usage Status (`pi-deepseek-stats`)
-
-**Usage:** Select a `deepseek` model. The footer shows today's usage, session usage, and current account balance.
-
-**Configuration:** Configure your DeepSeek API key in Pi. To select the displayed currency, edit the generated `~/.pi/agent/extensions/deepseek-stats.json`:
+**Configuration:** Configure provider credentials in Pi. The extension generates `~/.pi/agent/extensions/provider-stats.json`; all supported providers are enabled by default:
 
 ```json
 {
-  "currency": "CNY"
+  "providers": {
+    "deepseek": { "currency": "USD" },
+    "zai-coding-cn": { "enabled": false }
+  }
 }
 ```
 
-Supported values are `CNY` and `USD`. The compact footer must include `extensionStatuses` or `status:deepseek-stats` to display the value.
-
-### Z.ai Usage Status (`pi-zai-stats`)
-
-**Usage:** Select a `zai-coding-cn` model. The footer shows today's usage, session usage, and current account balance.
-
-**Configuration:** Configure your Zhipu API key in Pi. No extension-specific file is required. The compact footer must include `extensionStatuses` or `status:zai-stats` to display the value.
+`enabled` defaults to `true`. DeepSeek supports `CNY` and `USD` through `currency`; Z.ai always reports CNY. The compact footer must include `extensionStatuses` or the provider's stable status key: `status:codex-stats`, `status:deepseek-stats`, or `status:zai-stats`.
 
 ### Input History (`pi-history`)
 
