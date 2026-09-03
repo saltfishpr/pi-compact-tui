@@ -32,6 +32,7 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 | 空闲回顾     | 会话进入空闲状态时自动生成会话摘要，并通过 TUI widget 展示；亦可通过 `/recap` 手动触发。               |
 | Bash 审计    | 由指定模型评估待执行的 bash 命令：低风险仅提示，中风险以警告展示，高风险或审计失败会要求确认后再执行。 |
 | 会话小贴士   | 每次会话开始时，在 TUI 顶部展示一条使用小贴士。                                                        |
+| 网页搜索     | 提供 `web_search` 工具，返回网页搜索结果的标题、URL 和摘要。                                           |
 
 ## 插件说明
 
@@ -87,6 +88,35 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 ```
 
 `enabled` 默认值为 `true`。DeepSeek 可通过 `currency` 选择 `CNY` 或 `USD`；Z.ai 固定展示 CNY。紧凑页脚需包含 `extensionStatuses`，或对应 provider 的稳定状态 key：`status:codex-stats`、`status:deepseek-stats`、`status:zai-stats`。
+
+### 网页搜索（`pi-web-search`）
+
+**使用方法：** 为 Pi 提供 `web_search` 工具，用于查询实时或需要外部验证的信息；每次最多返回 10 条结果，包含标题、URL 和摘要。
+
+**配置：** 插件会生成 `~/.pi/agent/extensions/web-search.json`。默认使用 Brave；为选用的 provider 配置 API Key。API Key 值可使用 `${变量名}` 引用环境变量。
+
+```json
+{
+  "provider": "brave",
+  "maxResults": 5,
+  "providers": {
+    "brave": { "apiKey": "${BRAVE_SEARCH_API_KEY}" },
+    "bigmodel": {
+      "apiKey": "${BIGMODEL_API_KEY}",
+      "searchEngine": "search_std"
+    },
+    "tavily": {
+      "apiKey": "${TAVILY_API_KEY}",
+      "searchDepth": "basic"
+    }
+  }
+}
+```
+
+- `provider` — 可选 `brave`、`bigmodel` 或 `tavily`。
+- `maxResults` — 默认返回结果数，范围为 1–10。
+- `providers.bigmodel.searchEngine` — 可选 `search_std`、`search_pro`、`search_pro_sogou` 或 `search_pro_quark`。
+- `providers.tavily.searchDepth` — 可选 `basic` 或 `advanced`。
 
 ### 输入历史（`pi-history`）
 

@@ -32,6 +32,7 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 | Idle recap          | Generates a short session recap when the session goes idle and renders it in a TUI widget. Trigger it manually with `/recap`.                |
 | Bash audit          | Asks a configured model to rate outgoing bash commands and either warns you, blocks execution, or asks for confirmation on risky ones.       |
 | Session tips        | Shows a short usage tip at the top of the transcript each time a session starts.                                                             |
+| Web search          | Adds a `web_search` tool for retrieving current web results with titles, URLs, and snippets.                                                 |
 
 ## Extensions
 
@@ -87,6 +88,35 @@ Each bundled extension works immediately after installation unless its section s
 ```
 
 `enabled` defaults to `true`. DeepSeek supports `CNY` and `USD` through `currency`; Z.ai always reports CNY. The compact footer must include `extensionStatuses` or the provider's stable status key: `status:codex-stats`, `status:deepseek-stats`, or `status:zai-stats`.
+
+### Web Search (`pi-web-search`)
+
+**Usage:** Gives Pi a `web_search` tool for current or externally verifiable information. It returns up to 10 results with titles, URLs, and snippets.
+
+**Configuration:** The extension generates `~/.pi/agent/extensions/web-search.json`. Brave is selected by default; add the API key for your selected provider. API-key values may reference environment variables with `${VARIABLE_NAME}`.
+
+```json
+{
+  "provider": "brave",
+  "maxResults": 5,
+  "providers": {
+    "brave": { "apiKey": "${BRAVE_SEARCH_API_KEY}" },
+    "bigmodel": {
+      "apiKey": "${BIGMODEL_API_KEY}",
+      "searchEngine": "search_std"
+    },
+    "tavily": {
+      "apiKey": "${TAVILY_API_KEY}",
+      "searchDepth": "basic"
+    }
+  }
+}
+```
+
+- `provider` — `brave`, `bigmodel`, or `tavily`.
+- `maxResults` — default number of results, from 1 to 10.
+- `providers.bigmodel.searchEngine` — `search_std`, `search_pro`, `search_pro_sogou`, or `search_pro_quark`.
+- `providers.tavily.searchDepth` — `basic` or `advanced`.
 
 ### Input History (`pi-history`)
 
