@@ -21,7 +21,7 @@ export const providerStatsConfigSchema = z.object({
 
 export type ProviderStatsConfig = z.infer<typeof providerStatsConfigSchema>;
 
-const DEFAULT_CONFIG: ProviderStatsConfig = { providers: {} };
+const DEFAULT_CONFIG: ProviderStatsConfig = providerStatsConfigSchema.parse({});
 
 export function getConfigPath(): string {
   return join(getAgentDir(), "extensions", CONFIG_FILE_NAME);

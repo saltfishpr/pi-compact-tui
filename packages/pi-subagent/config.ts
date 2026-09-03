@@ -23,11 +23,7 @@ export const subagentConfigSchema = z.object({
 
 export type SubagentConfig = z.infer<typeof subagentConfigSchema>;
 
-const DEFAULT_CONFIG: SubagentConfig = {
-  enabled: true,
-  maxConcurrent: 4,
-  agents: {},
-};
+const DEFAULT_CONFIG: SubagentConfig = subagentConfigSchema.parse({});
 
 export function getConfigPath(): string {
   return join(getAgentDir(), "extensions", CONFIG_FILE_NAME);

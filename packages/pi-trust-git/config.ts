@@ -18,10 +18,7 @@ export const trustConfigSchema = z.object({
 
 export type TrustConfig = z.infer<typeof trustConfigSchema>;
 
-const DEFAULT_CONFIG = {
-  domains: [] as string[],
-  usernames: [] as string[],
-};
+const DEFAULT_CONFIG: TrustConfig = trustConfigSchema.parse({});
 
 /**
  * 从 `~/.pi/agent/extensions/trust.json` 加载 pi-trust-git 的全局配置。
