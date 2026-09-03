@@ -1,41 +1,47 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
+import * as z from "zod";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { Currency } from "./config";
-import { migrateLegacyBalanceState } from "./migrate";
 
 const STATE_FILE_NAME = "provider-stats-state.json";
 
-type Balances = Partial<Record<Currency, number>>;
+const balancesSchema = z.object({
+  CNY: z.number().optional(),
+  USD: z.number().optional(),
+});
 
-export interface ProviderBalanceState {
-  openingBalances: Balances;
-  latestBalances: Balances;
-}
+const providerBalanceStateSchema = z.object({
+  date: z.string(),
+  openingBalances: balancesSchema,
+});
 
-export interface BalanceState {
-  date: string;
-  providers: Record<string, ProviderBalanceState>;
-}
+const balanceStateSchema = z.object({
+  providers: z.record(z.string(), providerBalanceStateSchema),
+});
+
+export type BalanceState = z.infer<typeof balanceStateSchema>;
 
 /**
  * 记录指定 provider/currency 的最新余额，并返回当日开盘余额。
  *
  * 语义：
- * - 状态按本地日期分片；跨到新的一天时，用上一日的最新余额作为新一日的开盘余额。
- * - 每个 provider 首次在当日写入某个 currency 时，将当前 balance 作为开盘余额；后续调用只刷新 latestBalance。
+ * - 每个 provider 独立按本地日期记录开盘余额。
+ * - provider 在新一天首次获取某个 currency 的余额时，将该余额作为开盘余额。
  * - 返回值为该 provider/currency 当日的开盘余额，供调用方计算当日消耗（opening - balance）。
  */
 export function updateBalanceState(provider: string, currency: Currency, balance: number): number {
   const date = localDate();
-  const previous = readState();
-  const state = previous?.date === date ? previous : startDay(previous, date);
-  const providerState = (state.providers[provider] ??= { openingBalances: {}, latestBalances: {} });
-  providerState.openingBalances[currency] ??= providerState.latestBalances[currency] ?? balance;
-  providerState.latestBalances[currency] = balance;
+  const state = readState() ?? { providers: {} };
+  const providerState = state.providers[provider];
+  if (!providerState || providerState.date !== date) {
+    state.providers[provider] = { date, openingBalances: { [currency]: balance } };
+  } else {
+    providerState.openingBalances[currency] ??= balance;
+  }
   writeState(state);
-  return providerState.openingBalances[currency] ?? balance;
+  return state.providers[provider].openingBalances[currency] ?? balance;
 }
 
 export function formatBalanceStatus(
@@ -78,24 +84,11 @@ function localDate(): string {
   return `${year}-${month}-${day}`;
 }
 
-function startDay(previous: BalanceState | undefined, date: string): BalanceState {
-  const providers: Record<string, ProviderBalanceState> = {};
-  for (const [provider, state] of Object.entries(previous?.providers ?? {})) {
-    providers[provider] = {
-      openingBalances: { ...state.latestBalances },
-      latestBalances: { ...state.latestBalances },
-    };
-  }
-  return { date, providers };
-}
-
 function readState(): BalanceState | undefined {
   const path = getStatePath();
-  if (!existsSync(path)) return migrateLegacyBalanceState(path);
+  if (!existsSync(path)) return undefined;
   try {
-    const value = JSON.parse(readFileSync(path, "utf8")) as Partial<BalanceState>;
-    if (!value.date || !value.providers || typeof value.providers !== "object") return undefined;
-    return value as BalanceState;
+    return balanceStateSchema.parse(JSON.parse(readFileSync(path, "utf8")));
   } catch {
     return undefined;
   }
