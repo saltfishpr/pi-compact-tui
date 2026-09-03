@@ -206,7 +206,7 @@ effort: high
 
 **使用方法：** Agent 完成工作后，如果会话保持空闲 5 分钟，插件会生成简短摘要。执行 `/recap` 可立即触发。
 
-**配置：** 当前项目使用 `.pi/extensions/recap.json`，全局使用 `~/.pi/agent/extensions/recap.json`；项目配置优先。
+**配置：** 创建 `~/.pi/agent/extensions/recap.json`。
 
 ```json
 {

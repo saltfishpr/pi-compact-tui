@@ -206,7 +206,7 @@ Project definitions require a trusted project. Name conflicts are resolved in th
 
 **Usage:** After the agent finishes, the extension generates a short recap when the session remains idle for 5 minutes. Run `/recap` to trigger it immediately.
 
-**Configuration:** Create `.pi/extensions/recap.json` for the current project or `~/.pi/agent/extensions/recap.json` globally. Project settings take precedence.
+**Configuration:** Create `~/.pi/agent/extensions/recap.json`.
 
 ```json
 {

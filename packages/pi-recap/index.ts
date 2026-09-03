@@ -25,7 +25,7 @@ export default function (pi: ExtensionAPI) {
       return;
     }
 
-    const config = loadConfig(ctx.cwd);
+    const config = loadConfig();
 
     recapManager = new RecapManager(pi, config);
 

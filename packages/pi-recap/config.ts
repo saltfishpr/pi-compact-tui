@@ -1,5 +1,4 @@
-import { CONFIG_DIR_NAME, getAgentDir } from "@earendil-works/pi-coding-agent";
-import { defu } from "defu";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import ms, { type StringValue } from "ms";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -46,23 +45,15 @@ export const recapConfigSchema = modelSchema.extend({
 export type RecapConfig = z.infer<typeof recapConfigSchema>;
 
 /**
- * 加载 pi-recap 的配置，项目级优先。
+ * 从全局路径 `{getAgentDir()}/extensions/pi-recap.json` 加载 pi-recap 配置。
  *
- * - 项目级路径：`{cwd}/{CONFIG_DIR_NAME}/extensions/pi-recap.json`
- * - 全局级路径：`{getAgentDir()}/extensions/pi-recap.json`
+ * 缺失或解析失败的文件会被视为空对象；若结果不符合 schema 会抛出异常。
  *
- * 缺失或解析失败的文件会被视为空对象，但合并后的结果若不符合 schema 会抛出异常。
- *
- * @param cwd 项目工作目录。
- * @returns   合并并校验后的 {@link RecapConfig}。
+ * @returns 校验后的 {@link RecapConfig}。
  */
-export function loadConfig(cwd: string): RecapConfig {
+export function loadConfig(): RecapConfig {
   const globalPath = join(getAgentDir(), "extensions", CONFIG_FILE_NAME);
-  const projectPath = join(cwd, CONFIG_DIR_NAME, "extensions", CONFIG_FILE_NAME);
-
-  const merged = defu(readConfigFile(projectPath), readConfigFile(globalPath));
-
-  return recapConfigSchema.parse(merged);
+  return recapConfigSchema.parse(readConfigFile(globalPath));
 }
 
 function readConfigFile(path: string): Record<string, unknown> {
