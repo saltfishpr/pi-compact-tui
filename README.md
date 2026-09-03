@@ -176,7 +176,28 @@ Providers not configured are enabled by default.
 
 ### Web Search (`pi-web-search`)
 
-TODO
+Adds a `web_search` tool for finding current or externally verifiable information. Search results include titles, URLs, and snippets, so Pi can cite their sources. The tool is enabled after you configure a provider.
+
+**Configuration**: Edit `~/.pi/agent/extensions/web-search.json` and add the API key for the provider you want to use:
+
+```json
+{
+  "provider": "bigmodel",
+  "maxResults": 5,
+  "providers": {
+    "bigmodel": {
+      "apiKey": "your-api-key",
+      "searchEngine": "search_std"
+    }
+  }
+}
+```
+
+- `provider`: Active provider: `bigmodel`, `brave`, or `tavily`.
+- `maxResults`: Default number of results returned per search, from 1 to 10; defaults to 5.
+- `providers.bigmodel`: `apiKey` is required; `searchEngine` can be `search_std` (default), `search_pro`, `search_pro_sogou`, or `search_pro_quark`.
+- `providers.brave`: `apiKey` is required.
+- `providers.tavily`: `apiKey` is required; `searchDepth` can be `basic` (default) or `advanced`.
 
 ## License
 

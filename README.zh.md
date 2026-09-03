@@ -176,7 +176,28 @@ maxTurns: 30
 
 ### 联网搜索（`pi-web-search`）
 
-TODO
+提供 `web_search` 工具，用于查询需要时效性、外部信息或独立验证的信息。搜索结果包含标题、URL 和摘要，方便 Pi 在回答中引用来源。配置 provider 后工具自动启用。
+
+**配置**：编辑 `~/.pi/agent/extensions/web-search.json`，填写要使用的 provider 的 API Key：
+
+```json
+{
+  "provider": "bigmodel",
+  "maxResults": 5,
+  "providers": {
+    "bigmodel": {
+      "apiKey": "your-api-key",
+      "searchEngine": "search_std"
+    }
+  }
+}
+```
+
+- `provider`：当前使用的 provider，支持 `bigmodel`、`brave`、`tavily`。
+- `maxResults`：每次搜索默认返回的结果数，范围 1～10，默认 5。
+- `providers.bigmodel`：必须填写 `apiKey`；`searchEngine` 可选 `search_std`（默认）、`search_pro`、`search_pro_sogou`、`search_pro_quark`。
+- `providers.brave`：必须填写 `apiKey`。
+- `providers.tavily`：必须填写 `apiKey`；`searchDepth` 可选 `basic`（默认）或 `advanced`。
 
 ## License
 
