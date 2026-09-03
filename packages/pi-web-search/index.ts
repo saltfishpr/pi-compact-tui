@@ -1,9 +1,12 @@
 import { Type } from "@earendil-works/pi-ai";
 import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { truncateHead } from "../pi-common";
+import { loadConfig } from "./config";
 import { searchWeb } from "./search";
 
 export default function (pi: ExtensionAPI) {
+  let config = loadConfig();
+
   pi.registerTool({
     name: "web_search",
     label: "Web Search",
@@ -28,7 +31,7 @@ export default function (pi: ExtensionAPI) {
       ),
     }),
     async execute(_toolCallId, params, signal) {
-      const response = await searchWeb(params.query, params.maxResults, signal ?? new AbortController().signal);
+      const response = await searchWeb(config, params.query, params.maxResults, signal ?? new AbortController().signal);
       const text = formatResults(response);
       const truncation = truncateHead(text, {
         maxBytes: DEFAULT_MAX_BYTES,
@@ -40,6 +43,21 @@ export default function (pi: ExtensionAPI) {
         details: response,
       };
     },
+  });
+
+  pi.on("session_start", () => {
+    config = loadConfig();
+
+    const activeTools = pi.getActiveTools();
+    if (!config.provider) {
+      // 如果没有配置 provider，移除 web_search 工具
+      pi.setActiveTools(activeTools.filter((toolName) => toolName !== "web_search"));
+    } else {
+      // 如果配置了 provider，添加 web_search 工具
+      if (!activeTools.includes("web_search")) {
+        pi.setActiveTools([...activeTools, "web_search"]);
+      }
+    }
   });
 }
 

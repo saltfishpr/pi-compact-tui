@@ -2,7 +2,7 @@ import * as z from "zod";
 import type { SearchProvider, SearchRequest, SearchResponse, SearchResult } from "../types";
 
 export const bigmodelProviderConfigSchema = z.object({
-  apiKey: z.string().optional(),
+  apiKey: z.string(),
   searchEngine: z.enum(["search_std", "search_pro", "search_pro_sogou", "search_pro_quark"]).default("search_std"),
 });
 
@@ -20,12 +20,11 @@ interface BigModelResponse {
 
 export const bigmodelSearchProvider: SearchProvider<BigModelProviderConfig> = {
   id: "bigmodel",
-  async search(request: SearchRequest, config: BigModelProviderConfig, signal: AbortSignal): Promise<SearchResponse> {
-    const apiKey = resolveApiKey(config);
+  async search(config: BigModelProviderConfig, request: SearchRequest, signal: AbortSignal): Promise<SearchResponse> {
     const response = await fetch("https://open.bigmodel.cn/api/paas/v4/web_search", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${config.apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -43,20 +42,6 @@ export const bigmodelSearchProvider: SearchProvider<BigModelProviderConfig> = {
     return { provider: "bigmodel", query: request.query, results };
   },
 };
-
-function resolveApiKey(config: BigModelProviderConfig): string {
-  if (!config.apiKey) {
-    throw new Error("No API key configured for bigmodel.");
-  }
-  const apiKey = config.apiKey.replace(
-    /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g,
-    (_match, name: string) => process.env[name] ?? "",
-  );
-  if (!apiKey.trim()) {
-    throw new Error("The API key for bigmodel resolves to an empty value.");
-  }
-  return apiKey;
-}
 
 function toSearchResult(result: BigModelResult): SearchResult[] {
   if (!result.title || !result.link) return [];

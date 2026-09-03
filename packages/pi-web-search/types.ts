@@ -19,5 +19,5 @@ export interface SearchResponse {
 
 export interface SearchProvider<Config> {
   readonly id: SearchProviderId;
-  search(request: SearchRequest, config: Config, signal: AbortSignal): Promise<SearchResponse>;
+  search(config: Config, request: SearchRequest, signal: AbortSignal): Promise<SearchResponse>;
 }

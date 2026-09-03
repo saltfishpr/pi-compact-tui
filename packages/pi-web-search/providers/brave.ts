@@ -2,7 +2,7 @@ import * as z from "zod";
 import type { SearchProvider, SearchRequest, SearchResponse, SearchResult } from "../types";
 
 export const braveProviderConfigSchema = z.object({
-  apiKey: z.string().optional(),
+  apiKey: z.string(),
 });
 
 export type BraveProviderConfig = z.infer<typeof braveProviderConfigSchema>;
@@ -22,16 +22,15 @@ interface BraveResponse {
 // TODO Agent 生成，暂未测试
 export const braveSearchProvider: SearchProvider<BraveProviderConfig> = {
   id: "brave",
-  async search(request: SearchRequest, config: BraveProviderConfig, signal: AbortSignal): Promise<SearchResponse> {
+  async search(config: BraveProviderConfig, request: SearchRequest, signal: AbortSignal): Promise<SearchResponse> {
     const url = new URL("https://api.search.brave.com/res/v1/web/search");
-    const apiKey = resolveApiKey(config);
     url.searchParams.set("q", request.query);
     url.searchParams.set("count", String(request.maxResults));
 
     const response = await fetch(url, {
       headers: {
         Accept: "application/json",
-        "X-Subscription-Token": apiKey,
+        "X-Subscription-Token": config.apiKey,
       },
       signal,
     });
@@ -42,20 +41,6 @@ export const braveSearchProvider: SearchProvider<BraveProviderConfig> = {
     return { provider: "brave", query: request.query, results };
   },
 };
-
-function resolveApiKey(config: BraveProviderConfig): string {
-  if (!config.apiKey) {
-    throw new Error(`No API key configured for brave.`);
-  }
-  const apiKey = config.apiKey.replace(
-    /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g,
-    (_match, name: string) => process.env[name] ?? "",
-  );
-  if (!apiKey.trim()) {
-    throw new Error("The API key for brave resolves to an empty value.");
-  }
-  return apiKey;
-}
 
 function toSearchResult(result: BraveResult): SearchResult[] {
   if (!result.title || !result.url) return [];
