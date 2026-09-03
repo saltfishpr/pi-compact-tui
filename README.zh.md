@@ -100,7 +100,6 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 - `model` / `thinkingLevel`：生成回顾用的模型与推理档位，不填则使用当前会话模型。
 - `idle`：空闲多久后触发回顾，支持数字（毫秒）或 `"30s"`、`"1m"` 等时长字符串，最小 5 秒。
 
-> 注意：本插件已内置 recap 功能，如果你单独安装过 `saltfishpr/pi-recap`，请卸载它以避免冲突。
 
 ### Subagent（`pi-subagent`）
 

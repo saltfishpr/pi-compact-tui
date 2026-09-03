@@ -100,7 +100,6 @@ When a session is idle, automatically generates a short recap above the input bo
 - `model` / `thinkingLevel`: The model and reasoning level used to generate recaps. Defaults to the current session model when omitted.
 - `idle`: Time before triggering a recap. Accepts a number (milliseconds) or duration strings such as `"30s"` and `"1m"`; minimum 5 seconds.
 
-> Note: This package already includes recap functionality. If you have separately installed `saltfishpr/pi-recap`, uninstall it to avoid conflicts.
 
 ### Subagent (`pi-subagent`)
 
