@@ -1,9 +1,7 @@
 export { ScrollableSelectorComponent, type ScrollableSelectorOptions } from "./components/scrollable-selector";
-export { modelSchema, THINKING_LEVELS } from "./config";
-export type { ModelConfig } from "./config";
 export { createLogger } from "./logger";
 export type { CreateLoggerOptions, Logger } from "./logger";
-export { resolveModel } from "./model";
+export { modelSchema, resolveModel, THINKING_LEVELS } from "./model";
 export type { ResolvedModel, ResolveModelOptions } from "./model";
 export { truncateHead } from "./truncate";
 export { addUsageToTotals, createUsageTotals } from "./usage-totals";
