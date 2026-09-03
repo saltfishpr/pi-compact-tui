@@ -71,9 +71,7 @@ interface AgentToolDetails {
 export default function (pi: ExtensionAPI) {
   if (inChildSessionContext()) return;
 
-  const config = loadConfig();
-  if (!config.enabled) return;
-
+  let config = loadConfig();
   let agents: AgentProfile[] = [];
   let manager: SubagentManager | undefined;
 
@@ -206,6 +204,17 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("session_start", (_event, ctx) => {
+    config = loadConfig();
+
+    const activeTools = pi.getActiveTools();
+    if (!config.enabled) {
+      pi.setActiveTools(activeTools.filter((toolName) => toolName !== "agent"));
+      return;
+    }
+    if (!activeTools.includes("agent")) {
+      pi.setActiveTools([...activeTools, "agent"]);
+    }
+
     const catalog = discoverAgents(ctx.cwd, ctx.isProjectTrusted());
     reportDiagnostics(ctx, catalog.diagnostics);
     if (catalog.agents.length === 0) return;

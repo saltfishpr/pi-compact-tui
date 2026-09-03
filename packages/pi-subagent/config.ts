@@ -1,9 +1,6 @@
-import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
 import * as z from "zod";
 
-import { modelSchema, THINKING_LEVELS } from "../pi-common";
+import { getGlobalConfigPath, loadJSONConfig, modelSchema, THINKING_LEVELS } from "../pi-common";
 
 const CONFIG_FILE_NAME = "subagent.json";
 
@@ -23,34 +20,7 @@ export const subagentConfigSchema = z.object({
 
 export type SubagentConfig = z.infer<typeof subagentConfigSchema>;
 
-const DEFAULT_CONFIG: SubagentConfig = subagentConfigSchema.parse({});
-
-export function getConfigPath(): string {
-  return join(getAgentDir(), "extensions", CONFIG_FILE_NAME);
-}
-
 export function loadConfig(): SubagentConfig {
-  const globalPath = getConfigPath();
-  ensureDefaultGlobalConfig(globalPath);
-  return subagentConfigSchema.parse(readConfigFile(globalPath));
-}
-
-function ensureDefaultGlobalConfig(path: string): void {
-  if (existsSync(path)) return;
-  try {
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, `${JSON.stringify(DEFAULT_CONFIG, null, 2)}\n`, { flag: "wx" });
-  } catch {
-    // Continue with schema defaults when the global config cannot be created.
-  }
-}
-
-function readConfigFile(path: string): unknown {
-  if (!existsSync(path)) return DEFAULT_CONFIG;
-  try {
-    return JSON.parse(readFileSync(path, "utf8")) as unknown;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Cannot read ${path}: ${message}`);
-  }
+  const globalPath = getGlobalConfigPath(CONFIG_FILE_NAME);
+  return loadJSONConfig(globalPath, subagentConfigSchema);
 }

@@ -1,54 +1,67 @@
+English ｜ [中文](./README.zh.md)
+
 # pi-compact-tui
 
-A collection of [Pi](https://pi.dev/) extensions for everyday use. It streamlines the TUI, adds useful status information, and provides input history, a shortcut for starting new sessions, and an additional model provider.
+A collection of [Pi](https://pi.dev/) extensions for everyday use: a compact TUI, additional status information, command auditing, input history, session recaps, subagents, web search, and more.
 
 ![Demo](./assets/demo.gif)
 
 ## Installation
 
-### npm
-
 ```bash
 pi install npm:pi-compact-tui
-```
-
-### Git
-
-```bash
+# or
 pi install git:github.com/saltfishpr/pi-compact-tui
 ```
 
-## What You Get
-
-| Feature             | Purpose                                                                                                                                      |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Compact editor      | Displays the current activity, model, and reasoning level in the input box border, reducing extra UI clutter.                                |
-| Multi-line footer   | Shows the project path, Git branch, session, tokens, cost, context, and other extension statuses in one place.                               |
-| Usage status        | Shows subscription limits or account balance in the footer for OpenAI Codex, DeepSeek, and Z.ai.                                             |
-| Input history       | Use `shift+↑` / `shift+↓` to retrieve previously submitted inputs. History persists across sessions.                                         |
-| Quick new session   | Use `/clear` to start a new session immediately, just like `/new`.                                                                           |
-| Automatic Git trust | Automatically trusts projects that match rules based on the domain or username in the `origin` remote URL.                                   |
-| Subagents           | Registers an `agent` tool that delegates focused tasks to specialized subagents running in isolated contexts, with live progress in the TUI. |
-| Idle recap          | Generates a short session recap when the session goes idle and renders it in a TUI widget. Trigger it manually with `/recap`.                |
-| Bash audit          | Asks a configured model to rate outgoing bash commands and either warns you, blocks execution, or asks for confirmation on risky ones.       |
-| Session tips        | Shows a short usage tip at the top of the transcript each time a session starts.                                                             |
-| Web search          | Adds a `web_search` tool for retrieving current web results with titles, URLs, and snippets.                                                 |
+Configuration files for all extensions are stored in `~/.pi/agent/extensions/`. A default configuration is generated automatically on first use, so you do not need to create one manually.
 
 ## Extensions
 
-Each bundled extension works immediately after installation unless its section says otherwise. Global configuration files are stored in `~/.pi/agent/extensions/`.
+### Bash Command Audit (`pi-bash-audit`)
+
+Intercepts bash commands executed by Pi, with two layers of protection:
+
+1. **Rule matching**: includes a built-in allowlist of read-only commands (such as `ls`, `cat`, and `git status`), which are allowed directly. Rules can also explicitly allow a command, require confirmation, or send it to the model for auditing.
+2. **Model audit**: commands not allowed by a rule are evaluated for risk by the selected model. High-risk commands display a confirmation dialog for you to decide whether to run them.
+
+**Configuration**: Run `/audit` to select the audit model and reasoning level, or edit `~/.pi/agent/extensions/bash-audit.json` directly:
+
+```json
+{
+  "enable": true,
+  "model": "anthropic/claude-sonnet-4-5",
+  "thinkingLevel": "off",
+  "rules": [
+    { "command": "pnpm", "args": ["install"], "action": "allow" },
+    { "command": "rm", "args": ["-rf"], "action": "prompt" }
+  ]
+}
+```
+
+Field descriptions:
+
+- `model`: Audit model in `<provider>/<model-id>` format. Defaults to the current session model when omitted.
+- `thinkingLevel`: `off` / `minimal` / `low` / `medium` / `high` / `xhigh` / `max`.
+- `rules`: Each rule contains:
+  - `command`: command name (for example, `pnpm`);
+  - `args`: arguments to match (for example, `["install"]`);
+  - `except`: exceptional argument combinations for which this rule does not apply;
+  - `action`: `allow` (allow directly) / `prompt` (require manual confirmation) / `auto` (audit with the model).
+
+### Clear and Start a New Session (`pi-clear-command`)
+
+Provides the `/clear` command, equivalent to `/new`, to start a fresh session.
 
 ### Compact Editor (`pi-compact-editor`)
 
-**Usage:** In TUI mode, the input border shows the active model and reasoning level. While the agent works, it also shows states such as thinking, streaming, and the running tool.
+Replaces the default input box and displays status in its border: activity status on the left (Thinking / Streaming / Running xxx), and the current model and reasoning level on the right.
 
-**Configuration:** None.
+### Configurable Footer (`pi-compact-footer`)
 
-### Compact Footer (`pi-compact-footer`)
+Replaces the default footer with a configurable, multi-line status bar. It supports left and right alignment and lets you arrange the displayed items freely: directory, Git branch, session name, token usage (input/output/cache read/cache write), cache hit rate, cost, context usage, model, reasoning level, and statuses registered by other extensions.
 
-**Usage:** In TUI mode, the footer displays configured session, model, token, cost, context, Git, and extension status information.
-
-**Configuration:** The extension generates `~/.pi/agent/extensions/footer.json`. Edit it and restart the Pi session:
+**Configuration**: Edit `~/.pi/agent/extensions/footer.json`:
 
 ```json
 {
@@ -63,214 +76,107 @@ Each bundled extension works immediately after installation unless its section s
 }
 ```
 
-- `separator` — text inserted between visible elements.
-- `lines` — footer rows, each with optional `left` and `right` element arrays.
-- Built-in elements: `pwd`, `branch`, `sessionName`, `inputTokens`, `outputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `cacheHitRate`, `cost`, `context`, `provider`, `model`, `thinkingLevel`, and `extensionStatuses`.
-- Use `status:<key>` to place one extension status explicitly, such as `status:codex-stats`, `status:deepseek-stats`, or `status:zai-stats`.
-
-### Usage Status (`pi-usage-stats`)
-
-**Usage:** The extension displays a status for the selected provider and refreshes it as you work:
-
-- `openai-codex`: remaining percentage for each subscription rate-limit window.
-- `deepseek`: today's usage, session usage, and account balance.
-- `zai-coding-cn`: today's usage, session usage, and account balance.
-
-**Configuration:** Configure provider credentials in Pi. The extension generates `~/.pi/agent/extensions/provider-stats.json`; all supported providers are enabled by default:
-
-```json
-{
-  "providers": {
-    "deepseek": { "currency": "USD" },
-    "zai-coding-cn": { "enabled": false }
-  }
-}
-```
-
-`enabled` defaults to `true`. DeepSeek supports `CNY` and `USD` through `currency`; Z.ai always reports CNY. The compact footer must include `extensionStatuses` or the provider's stable status key: `status:codex-stats`, `status:deepseek-stats`, or `status:zai-stats`.
-
-### Web Search (`pi-web-search`)
-
-**Usage:** Gives Pi a `web_search` tool for current or externally verifiable information. It returns up to 10 results with titles, URLs, and snippets.
-
-**Configuration:** The extension generates `~/.pi/agent/extensions/web-search.json`. Brave is selected by default; add the API key for your selected provider. API-key values may reference environment variables with `${VARIABLE_NAME}`.
-
-```json
-{
-  "provider": "brave",
-  "maxResults": 5,
-  "providers": {
-    "brave": { "apiKey": "${BRAVE_SEARCH_API_KEY}" },
-    "bigmodel": {
-      "apiKey": "${BIGMODEL_API_KEY}",
-      "searchEngine": "search_std"
-    },
-    "tavily": {
-      "apiKey": "${TAVILY_API_KEY}",
-      "searchDepth": "basic"
-    }
-  }
-}
-```
-
-- `provider` — `brave`, `bigmodel`, or `tavily`.
-- `maxResults` — default number of results, from 1 to 10.
-- `providers.bigmodel.searchEngine` — `search_std`, `search_pro`, `search_pro_sogou`, or `search_pro_quark`.
-- `providers.tavily.searchDepth` — `basic` or `advanced`.
+- `lines`: One object per line. `left` and `right` are arrays of item names aligned to their respective sides.
+- Available item names: `pwd`, `branch`, `sessionName`, `inputTokens`, `outputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `cacheHitRate`, `cost`, `context`, `provider`, `model`, `thinkingLevel`, `extensionStatuses`, and `status:<key>` (references a status registered by another extension, such as `status:codex-stats`).
 
 ### Input History (`pi-history`)
 
-**Usage:** Press `shift+↑` to recall an earlier submitted input and `shift+↓` to move forward or restore the draft. History persists across sessions.
+Press `Shift+↑` / `Shift+↓` in the input box to browse previous input. The latest 100 entries are persisted across sessions.
 
-**Configuration:** None. The extension manages `~/.pi/agent/extensions/history.jsonl` automatically.
+### Session Recap (`pi-recap`)
 
-### Clear Command (`pi-clear-command`)
+When a session is idle, automatically generates a short recap above the input box (what you are currently doing and the next step). It is cleared automatically when you begin a new input or resume work. You can also run `/recap` at any time to generate one manually.
 
-**Usage:** Run `/clear` to start a fresh session. It behaves like `/new`.
-
-**Configuration:** None.
-
-### Automatic Git Trust (`pi-trust-git`)
-
-**Usage:** When Pi checks project trust, the extension reads the `origin` remote and automatically trusts the project if its domain or first path username matches an allowlist. Otherwise, Pi continues its normal trust flow.
-
-**Configuration:** Edit the generated `~/.pi/agent/extensions/trust.json`:
+**Configuration**: Edit `~/.pi/agent/extensions/recap.json`:
 
 ```json
 {
-  "domains": ["private-gitlab.com"],
-  "usernames": ["saltfishpr", "my-team"]
+  "model": "anthropic/claude-sonnet-4-5",
+  "thinkingLevel": "off",
+  "idle": "30s"
 }
 ```
 
-Matching is case-insensitive, and a match in either list is sufficient.
+- `model` / `thinkingLevel`: The model and reasoning level used to generate recaps. Defaults to the current session model when omitted.
+- `idle`: Time before triggering a recap. Accepts a number (milliseconds) or duration strings such as `"30s"` and `"1m"`; minimum 5 seconds.
 
-### Subagents (`pi-subagent`)
+> Note: This package already includes recap functionality. If you have separately installed `saltfishpr/pi-recap`, uninstall it to avoid conflicts.
 
-**Usage:** Ask Pi to delegate a focused task to `explore` for codebase facts or `planner` for an implementation plan. Each task runs in an isolated session and returns its final answer to the parent session.
+### Subagent (`pi-subagent`)
 
-```text
-Use the planner subagent to inspect this project and create an implementation plan for adding user authentication.
+Provides Pi with an `agent` tool for delegating independent subtasks, such as codebase exploration and planning, to subagents running in isolated contexts. Two subagents are included: `explore` and `planner`; you can add your own as well.
+
+**Add a subagent**: Place a Markdown file in `~/.pi/agents/` (global) or `.pi/agents/` (project). The filename becomes the subagent name:
+
+```markdown
+---
+description: Review code changes and produce a list of issues
+model: anthropic/claude-sonnet-4-5
+effort: low
+maxTurns: 30
+---
+
+Write the subagent system prompt here...
 ```
 
-**Configuration:** The generated `~/.pi/agent/extensions/subagent.json` enables the `agent` tool by default. Set `enabled` to `false` to disable it.
+- `description` (required): Tells the main model when to use this subagent.
+- `model` / `effort` / `maxTurns`: Optional. They inherit the current session model when omitted; `maxTurns` defaults to 50.
+
+**Configuration**: Edit `~/.pi/agent/extensions/subagent.json` to disable the feature, limit concurrency, or override `model` / `effort` / `maxTurns` by subagent name:
 
 ```json
 {
   "enabled": true,
   "maxConcurrent": 4,
   "agents": {
-    "explore": {
-      "model": "deepseek/deepseek-chat",
-      "effort": "medium",
-      "maxTurns": 30
-    }
+    "explore": { "effort": "low" }
   }
 }
 ```
 
-`maxConcurrent` controls how many subagents may run at once (1–32); additional calls wait in FIFO order. Subagents share the current working directory, so parallel editing tasks can conflict.
+### Usage Tips (`pi-tips`)
 
-Use `agents.<name>` to override an individual subagent's `model`, `effort`, or `maxTurns` without editing its Markdown definition. Any field you omit falls back to the subagent's own frontmatter.
+Displays a random usage tip at the top of every new session, such as keyboard shortcuts and common commands. Supports multiple languages.
 
-To add a custom subagent, create a Markdown file in `~/.pi/agent/agents/` for all projects or `.pi/agents/` for the current trusted project. The filename becomes the subagent name. Run `/reload` after changes.
+### Automatic Git Trust (`pi-trust-git`)
 
-```markdown
----
-description: Reviews code changes for correctness and maintainability without editing files.
-tools:
-  - read
-  - bash
-effort: high
----
+Automatically trusts projects based on their Git `origin` remote, skipping Pi's manual confirmation.
 
-Review the requested changes and report concrete problems with file references.
-```
-
-| Field         | Required | Purpose                                                                                                                 |
-| ------------- | -------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `description` | Yes      | Tells Pi when this subagent is useful.                                                                                  |
-| `tools`       | No       | Limits the tools it can use. Omit to allow all built-in coding tools.                                                   |
-| `model`       | No       | Uses a specific `provider/model`. Omit to inherit the current model. Out-of-scope models fall back to the parent model. |
-| `effort`      | No       | Sets reasoning effort: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`.                                    |
-| `skills`      | No       | Exact allow list of Pi skills. Omit to load no skills.                                                                  |
-| `maxTurns`    | No       | Limits how many turns the subagent may take; defaults to 50.                                                            |
-
-Subagent sessions do not load any extensions.
-
-Project definitions require a trusted project. Name conflicts are resolved in this order: project, global, bundled.
-
-### Idle Recap (`pi-recap`)
-
-![Recap](./assets/recap.png)
-
-**Usage:** After the agent finishes, the extension generates a short recap when the session remains idle for 5 minutes. Run `/recap` to trigger it immediately.
-
-**Configuration:** Create `~/.pi/agent/extensions/recap.json`.
+**Configuration**: Edit `~/.pi/agent/extensions/trust.json`. A match against either list automatically trusts the project:
 
 ```json
 {
-  "model": "openai/gpt-4o-mini",
-  "thinkingLevel": "off",
-  "idle": "3m"
+  "domains": ["github.com"],
+  "usernames": ["saltfishpr"]
 }
 ```
 
-- `model` — optional dedicated model in `provider/model` format; defaults to the current model.
-- `thinkingLevel` — optional; `off`, `minimal`, `low`, `medium`, `high`, `xhigh`, or `max`.
-- `idle` — optional duration such as `"3m"` or `180000`; minimum 5 seconds.
+- `domains`: Trusted remote domains (such as `github.com` and `gitlab.com`).
+- `usernames`: Trusted first path segments in remotes (for example, `saltfishpr` in `github.com/saltfishpr/xxx`).
 
-### Bash Audit (`pi-bash-audit`)
+### Usage Status (`pi-usage-stats`)
 
-**Usage:** Disabled by default. In TUI mode, run `/audit`, then select a model and reasoning level. The extension lets recognised read-only commands run directly and uses the selected model to assess other commands. High-risk commands, unavailable models, and failed audits require your confirmation before execution.
+Displays provider usage for the current model in the status bar:
 
-**Configuration:** `/audit` creates `~/.pi/agent/extensions/bash-audit.json`. To configure it yourself, create or edit the file:
+- **openai-codex**: Remaining subscription quota in the 5-hour / 7-day rate-limit windows.
+- **deepseek**: Account balance.
+- **zai-coding-cn** (Zhipu): Account balance.
+
+**Configuration**: Edit `~/.pi/agent/extensions/provider-stats.json` to disable individual providers as needed or set the balance currency:
 
 ```json
 {
-  "enable": true,
-  "model": "openai/gpt-4o-mini",
-  "thinkingLevel": "off",
-  "rules": [
-    { "command": "git", "args": ["log"], "action": "allow" },
-    { "command": "git", "args": ["push"], "action": "prompt" }
-  ]
+  "providers": {
+    "deepseek": { "enabled": true, "currency": "CNY" }
+  }
 }
 ```
 
-- `enable` — optional; set to `false` to turn auditing off without deleting the configuration.
-- `model` — required when auditing is enabled; use `provider/model` format.
-- `thinkingLevel` — optional reasoning level supported by the selected model.
-- `rules` — optional ordered overrides; the first matching rule applies.
-  - `command` matches the command name and `args` matches its arguments. Literal arguments match a prefix; use `*` within one argument, `**` for any number of arguments, or `/regex/` for a full argument match.
-  - `action` can be `allow` (run directly), `prompt` (always ask), or `auto` (ask the audit model).
-  - `except` optionally excludes argument patterns from a rule.
+Providers not configured are enabled by default.
 
-### Session Tips (`pi-tips`)
+### Web Search (`pi-web-search`)
 
-**Usage:** A random tip appears at the top of the transcript when a session starts.
-
-**Configuration:** Tips use English by default. To select Chinese or another locale provided by rpiv extensions, install the shared locale extension and run `/languages`:
-
-```bash
-pi install npm:@juicesharp/rpiv-i18n
-```
-
-## Updating and Uninstalling
-
-### npm
-
-```bash
-pi update npm:pi-compact-tui
-pi remove npm:pi-compact-tui
-```
-
-### Git
-
-```bash
-pi update --extensions
-pi remove git:github.com/saltfishpr/pi-compact-tui
-```
+TODO
 
 ## License
 

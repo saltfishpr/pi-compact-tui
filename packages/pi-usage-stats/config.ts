@@ -1,6 +1,4 @@
-import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { getGlobalConfigPath, loadJSONConfig } from "../pi-common";
 import * as z from "zod";
 import { migrateLegacyConfig } from "./migrate";
 
@@ -21,35 +19,9 @@ export const providerStatsConfigSchema = z.object({
 
 export type ProviderStatsConfig = z.infer<typeof providerStatsConfigSchema>;
 
-const DEFAULT_CONFIG: ProviderStatsConfig = providerStatsConfigSchema.parse({});
-
-export function getConfigPath(): string {
-  return join(getAgentDir(), "extensions", CONFIG_FILE_NAME);
-}
-
 export function loadConfig(): ProviderStatsConfig {
-  const path = getConfigPath();
-  ensureDefaultConfig(path);
-  const config = providerStatsConfigSchema.parse(readConfigFile(path));
+  const path = getGlobalConfigPath(CONFIG_FILE_NAME);
+  const config = loadJSONConfig(path, providerStatsConfigSchema);
   migrateLegacyConfig(path, config);
   return config;
-}
-
-function ensureDefaultConfig(path: string): void {
-  if (existsSync(path)) return;
-  try {
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, `${JSON.stringify(DEFAULT_CONFIG, null, 2)}\n`, { flag: "wx" });
-  } catch {
-    // Continue with the in-memory default when the config file cannot be created.
-  }
-}
-
-function readConfigFile(path: string): unknown {
-  if (!existsSync(path)) return DEFAULT_CONFIG;
-  try {
-    return JSON.parse(readFileSync(path, "utf8")) as unknown;
-  } catch {
-    return DEFAULT_CONFIG;
-  }
 }

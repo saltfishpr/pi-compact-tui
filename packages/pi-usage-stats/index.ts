@@ -10,7 +10,7 @@ interface StatusCacheEntry {
 }
 
 export default function (pi: ExtensionAPI) {
-  const config = loadConfig();
+  let config = loadConfig();
   const statusCache = new Map<ProviderStatsAdapter, StatusCacheEntry>();
   let inflight: AbortController | undefined;
 
@@ -75,6 +75,7 @@ export default function (pi: ExtensionAPI) {
   }
 
   pi.on("session_start", (_event, ctx) => {
+    config = loadConfig();
     resetSession();
     void refresh(ctx);
   });

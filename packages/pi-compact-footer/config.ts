@@ -1,7 +1,5 @@
-import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
 import * as z from "zod";
+import { getGlobalConfigPath, loadJSONConfig } from "../pi-common";
 
 const CONFIG_FILE_NAME = "footer.json";
 
@@ -48,38 +46,13 @@ const DEFAULT_CONFIG: FooterConfig = {
   lines: [
     {
       left: ["pwd", "branch", "sessionName"],
-      right: ["cacheHitRate", "cost", "context"],
+      right: ["status:codex-stats", "status:deepseek-stats", "status:zai-stats", "cacheHitRate", "cost", "context"],
     },
     { left: ["extensionStatuses"] },
   ],
 };
 
-/**
- * 从 `~/.pi/agent/extensions/footer.json` 加载 pi-compact-footer 的全局配置。
- *
- * @returns 校验后的 {@link FooterConfig}。
- */
 export function loadConfig(): FooterConfig {
-  const globalPath = join(getAgentDir(), "extensions", CONFIG_FILE_NAME);
-  ensureDefaultGlobalConfig(globalPath);
-  return footerConfigSchema.parse(readConfigFile(globalPath));
-}
-
-function ensureDefaultGlobalConfig(path: string): void {
-  if (existsSync(path)) return;
-  try {
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, `${JSON.stringify(DEFAULT_CONFIG, null, 2)}\n`, { flag: "wx" });
-  } catch {
-    // Continue with schema defaults when the global config cannot be created.
-  }
-}
-
-function readConfigFile(path: string): unknown {
-  if (!existsSync(path)) return DEFAULT_CONFIG;
-  try {
-    return JSON.parse(readFileSync(path, "utf8")) as unknown;
-  } catch {
-    return DEFAULT_CONFIG;
-  }
+  const globalPath = getGlobalConfigPath(CONFIG_FILE_NAME);
+  return loadJSONConfig(globalPath, footerConfigSchema, { defaultConfig: DEFAULT_CONFIG });
 }
