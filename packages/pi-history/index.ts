@@ -1,4 +1,5 @@
 import { getAgentDir, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { FilterableSelectorComponent } from "../pi-common/components/filterable-selector";
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import writeFileAtomic from "write-file-atomic";
@@ -83,23 +84,6 @@ export default function (pi: ExtensionAPI) {
     return sessionHistory.length === 0 ? history : [...history, ...sessionHistory];
   }
 
-  pi.on("session_start", (_event, ctx) => {
-    if (!ctx.hasUI || !claimShortcutHint(shortcutHintFile)) return;
-    ctx.ui.notify("历史输入快捷键：shift+↑ 上一条，shift+↓ 下一条", "info");
-  });
-
-  pi.on("input", (event) => {
-    if (event.source !== "interactive") return;
-    const text = event.text;
-    if (!text || text.trim().length === 0) return;
-    const combined = view();
-    if (combined[combined.length - 1] !== text) {
-      sessionHistory.push(text);
-    }
-    cursor = null;
-    draft = "";
-  });
-
   pi.registerShortcut("shift+up", {
     description: "Recall previous user message from history",
     handler: async (ctx) => {
@@ -130,6 +114,54 @@ export default function (pi: ExtensionAPI) {
         draft = "";
       }
     },
+  });
+
+  pi.registerCommand("history", {
+    description: "Browse and search input history",
+    handler: async (_args, ctx) => {
+      if (ctx.mode !== "tui") return;
+      const items = view();
+      const selected = await ctx.ui.custom<string | undefined>((tui, theme, keybindings, done) => {
+        const selector = new FilterableSelectorComponent({
+          title: "输入历史",
+          searchHint: "模糊搜索历史输入",
+          items,
+          searchText: (item) => item,
+          renderItem: (item) => item.replace(/\s+/g, " "),
+          initialIndex: items.length - 1,
+          onSelect: done,
+          onCancel: () => done(undefined),
+          theme,
+          keybindings,
+        });
+        return {
+          render: (width) => selector.render(width),
+          invalidate: () => selector.invalidate(),
+          handleInput: (data) => {
+            selector.handleInput(data);
+            tui.requestRender();
+          },
+        };
+      });
+      if (selected !== undefined) ctx.ui.setEditorText(selected);
+    },
+  });
+
+  pi.on("session_start", (_event, ctx) => {
+    if (!ctx.hasUI || !claimShortcutHint(shortcutHintFile)) return;
+    ctx.ui.notify("历史输入快捷键：shift+↑ 上一条，shift+↓ 下一条", "info");
+  });
+
+  pi.on("input", (event) => {
+    if (event.source !== "interactive") return;
+    const text = event.text;
+    if (!text || text.trim().length === 0) return;
+    const combined = view();
+    if (combined[combined.length - 1] !== text) {
+      sessionHistory.push(text);
+    }
+    cursor = null;
+    draft = "";
   });
 
   pi.on("session_shutdown", () => {
