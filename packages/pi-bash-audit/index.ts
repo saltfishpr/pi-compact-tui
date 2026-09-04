@@ -78,11 +78,6 @@ export default function (pi: ExtensionAPI) {
       }
 
       const models = ctx.modelRegistry.getAvailable();
-      if (models.length === 0) {
-        ctx.ui.notify("[bash-audit] no available models", "warning");
-        return;
-      }
-
       const previousModel = config.model
         ? models.find((model) => `${model.provider}/${model.id}` === config.model)
         : undefined;

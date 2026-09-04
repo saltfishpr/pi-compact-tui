@@ -28,7 +28,7 @@ export default function (pi: ExtensionAPI) {
       const selected = await ctx.ui.custom<TestItem | undefined>((tui, theme, keybindings, done) => {
         const selector = new FilterableSelectorComponent<TestItem>({
           title: "Test Filterable Selector",
-          searchHint: "Search by provider, id, or name (e.g. \"anthropic opus\")",
+          searchHint: 'Search by provider, id, or name (e.g. "anthropic opus")',
           items: ITEMS,
           searchText: (item) => `${item.provider} ${item.id} ${item.name}`,
           renderItem: (item) => `${item.id} [${item.provider}] ${item.name}`,
