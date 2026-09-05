@@ -5,18 +5,7 @@ import {
   type KeybindingsManager,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
-import {
-  Container,
-  CURSOR_MARKER,
-  fuzzyFilter,
-  getKeybindings,
-  Input,
-  Spacer,
-  Text,
-  truncateToWidth,
-  visibleWidth,
-  type Focusable,
-} from "@earendil-works/pi-tui";
+import { Container, fuzzyFilter, getKeybindings, Input, Spacer, Text, type Focusable } from "@earendil-works/pi-tui";
 
 /** Configuration for a filterable selector. */
 export type FilterableSelectorOptions<T> = {
@@ -50,7 +39,7 @@ export type FilterableSelectorOptions<T> = {
  * Construct it from a `ctx.ui.custom()` factory with that callback's theme and keybindings.
  */
 export class FilterableSelectorComponent<T> extends Container implements Focusable {
-  private readonly searchInput: PlaceholderInput;
+  private readonly searchInput: Input;
   private readonly listContainer = new Container();
   private readonly items: readonly T[];
   private filteredItems: readonly T[];
@@ -69,7 +58,10 @@ export class FilterableSelectorComponent<T> extends Container implements Focusab
   constructor(private readonly opts: FilterableSelectorOptions<T>) {
     super();
     this.items = opts.items;
-    this.searchInput = new PlaceholderInput(opts.searchHint, opts.theme);
+    this.searchInput = new Input({
+      placeholder: opts.searchHint,
+      placeholderStyle: (text: string) => opts.theme.fg("dim", text),
+    });
     this.filteredItems = this.items;
     this.selectedIndex = normalizeIndex(opts.initialIndex, this.items.length);
 
@@ -166,31 +158,6 @@ export class FilterableSelectorComponent<T> extends Container implements Focusab
         new Text(theme.fg("dim", `  (${this.selectedIndex + 1}/${this.filteredItems.length})`), 0, 0),
       );
     }
-  }
-}
-
-class PlaceholderInput extends Input {
-  constructor(
-    private readonly placeholder: string,
-    private readonly theme: Theme,
-  ) {
-    super();
-  }
-
-  render(width: number): string[] {
-    if (this.getValue()) return super.render(width);
-
-    const prompt = "> ";
-    const availableWidth = width - prompt.length;
-    if (availableWidth <= 0) return [prompt];
-
-    const hint = truncateToWidth(this.placeholder, availableWidth);
-    const firstCharacter = [...hint][0] ?? " ";
-    const rest = hint.slice(firstCharacter.length);
-    const marker = this.focused ? CURSOR_MARKER : "";
-    const cursor = `\x1b[7m${firstCharacter}\x1b[27m`;
-    const padding = " ".repeat(Math.max(0, availableWidth - visibleWidth(hint)));
-    return [`${prompt}${this.theme.fg("dim", `${marker}${cursor}${rest}`)}${padding}`];
   }
 }
 
