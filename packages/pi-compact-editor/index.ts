@@ -1,37 +1,5 @@
 import { CustomEditor, type ExtensionAPI, type KeybindingsManager, type Theme } from "@earendil-works/pi-coding-agent";
-import { Loader, truncateToWidth, visibleWidth, type EditorTheme, type TUI } from "@earendil-works/pi-tui";
-
-function fitBorder(
-  left: string,
-  right: string,
-  width: number,
-  border: (text: string) => string,
-  fill: (text: string) => string = border,
-): string {
-  if (width <= 0) return "";
-  if (width === 1) return border("─");
-
-  let leftText = left;
-  let rightText = right;
-  const fixedWidth = 2;
-  const minimumGap = 3;
-
-  while (
-    fixedWidth + visibleWidth(leftText) + visibleWidth(rightText) + minimumGap > width &&
-    visibleWidth(rightText) > 0
-  ) {
-    rightText = truncateToWidth(rightText, Math.max(0, visibleWidth(rightText) - 1), "");
-  }
-  while (
-    fixedWidth + visibleWidth(leftText) + visibleWidth(rightText) + minimumGap > width &&
-    visibleWidth(leftText) > 0
-  ) {
-    leftText = truncateToWidth(leftText, Math.max(0, visibleWidth(leftText) - 1), "");
-  }
-
-  const gapWidth = Math.max(0, width - fixedWidth - visibleWidth(leftText) - visibleWidth(rightText));
-  return `${border("─")}${leftText}${fill("─".repeat(gapWidth))}${rightText}${border("─")}`;
-}
+import { Loader, visibleWidth, type EditorTheme, type TUI } from "@earendil-works/pi-tui";
 
 class CompactEditor extends CustomEditor {
   private uiTheme: Theme;
@@ -79,25 +47,41 @@ class CompactEditor extends CustomEditor {
     this.tui.requestRender();
   }
 
-  render(width: number): string[] {
-    const lines = super.render(width);
-    if (lines.length < 2) return lines;
+  protected renderTopBorder(width: number, hiddenLineCount: number): string {
+    if (width <= 0) return "";
+    if (width === 1) return this.borderColor("─");
 
-    const topRight = this.fitLabel(this.model);
     const topLeft = this.isWorking ? this.fitBorderLabel(this.renderWorkingLoader(width)) : "";
+    const topMiddle = hiddenLineCount > 0 ? this.fitBorderLabel(`↑ ${hiddenLineCount} more`) : "";
+    const topRight = this.model ? this.uiTheme.fg("dim", ` ${this.model} `) : "";
 
-    const borderColor = (text: string) => this.borderColor(text);
+    const middleWidth = visibleWidth(topMiddle);
+    const labels = [
+      { text: topLeft, start: 1 },
+      { text: topMiddle, start: Math.floor((width - middleWidth) / 2) },
+      { text: topRight, start: width - visibleWidth(topRight) - 1 },
+    ].filter((label) => label.text);
 
-    lines[0] = fitBorder(topLeft, topRight, width, borderColor);
-    return lines;
+    let cursor = 0;
+    for (const label of labels) {
+      if (label.start < 0 || label.start - cursor < (cursor === 0 ? 0 : 3)) {
+        return super.renderTopBorder(width, hiddenLineCount);
+      }
+      cursor = label.start + visibleWidth(label.text);
+    }
+    if (cursor > width) return super.renderTopBorder(width, hiddenLineCount);
+
+    let border = "";
+    cursor = 0;
+    for (const label of labels) {
+      border += this.borderColor("─".repeat(label.start - cursor)) + label.text;
+      cursor = label.start + visibleWidth(label.text);
+    }
+    return border + this.borderColor("─".repeat(width - cursor));
   }
 
   private renderWorkingLoader(width: number): string {
     return this.workingLoader.render(width).join("").trim();
-  }
-
-  private fitLabel(text: string): string {
-    return text ? this.uiTheme.fg("dim", ` ${text} `) : "";
   }
 
   private fitBorderLabel(text: string): string {
