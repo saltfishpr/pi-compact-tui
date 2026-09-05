@@ -3,6 +3,7 @@ import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, type ExtensionAPI } from "@earend
 import { truncateHead } from "../pi-common";
 import { loadConfig } from "./config";
 import { searchWeb } from "./search";
+import { SearchResponse } from "./types";
 
 export default function (pi: ExtensionAPI) {
   let config = loadConfig();
@@ -61,7 +62,7 @@ export default function (pi: ExtensionAPI) {
   });
 }
 
-function formatResults(response: Awaited<ReturnType<typeof searchWeb>>): string {
+function formatResults(response: Awaited<SearchResponse>): string {
   if (response.results.length === 0) {
     return `No ${response.provider} results found for: ${response.query}`;
   }
