@@ -65,9 +65,9 @@
     }
   },
   "devDependencies": {
-    "@earendil-works/pi-ai": "^0.84.3",
-    "@earendil-works/pi-coding-agent": "^0.84.3",
-    "@earendil-works/pi-tui": "^0.84.3",
+    "@earendil-works/pi-ai": "^0.85.0",
+    "@earendil-works/pi-coding-agent": "^0.85.0",
+    "@earendil-works/pi-tui": "^0.85.0",
     "@juicesharp/rpiv-i18n": "*",
     "@types/ms": "^2.1.0",
     "@types/node": "^26.0.1",
