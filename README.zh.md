@@ -25,6 +25,8 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 1. **规则匹配**：内置一份"只读命令白名单"（如 `ls`、`cat`、`git status` 等），命中的直接放行；也可以用规则强制放行、强制确认或交给模型审计。
 2. **模型审计**：规则未放行的命令交给指定模型判断风险，高风险命令弹出确认框，由你决定是否执行。
 
+![命令审计](./assets/audit.png)
+
 **配置**：运行 `/audit` 选择审计模型和推理档位即可启用，也可以直接编辑 `~/.pi/agent/extensions/bash-audit.json`：
 
 ```json
@@ -104,6 +106,8 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 ### Subagent（`pi-subagent`）
 
 为 Pi 提供 `agent` 工具，可把独立子任务（如探索代码库、制定计划）委托给子代理，在隔离上下文中运行。内置 `explore`（探索）和 `planner`（规划）两个子代理，你也可以添加自己的。
+
+![子代理](./assets/subagent.png)
 
 **添加子代理**：在 `~/.pi/agents/`（全局）或 `.pi/agents/`（项目）下放置 Markdown 文件，文件名即子代理名：
 

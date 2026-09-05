@@ -25,6 +25,8 @@ Intercepts bash commands executed by Pi, with two layers of protection:
 1. **Rule matching**: includes a built-in allowlist of read-only commands (such as `ls`, `cat`, and `git status`), which are allowed directly. Rules can also explicitly allow a command, require confirmation, or send it to the model for auditing.
 2. **Model audit**: commands not allowed by a rule are evaluated for risk by the selected model. High-risk commands display a confirmation dialog for you to decide whether to run them.
 
+![Command Audit](./assets/audit.png)
+
 **Configuration**: Run `/audit` to select the audit model and reasoning level, or edit `~/.pi/agent/extensions/bash-audit.json` directly:
 
 ```json
@@ -104,6 +106,8 @@ When a session is idle, automatically generates a short recap above the input bo
 ### Subagent (`pi-subagent`)
 
 Provides Pi with an `agent` tool for delegating independent subtasks, such as codebase exploration and planning, to subagents running in isolated contexts. Two subagents are included: `explore` and `planner`; you can add your own as well.
+
+![Subagent](./assets/subagent.png)
 
 **Add a subagent**: Place a Markdown file in `~/.pi/agents/` (global) or `.pi/agents/` (project). The filename becomes the subagent name:
 
