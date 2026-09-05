@@ -84,7 +84,7 @@ class CompactEditor extends CustomEditor {
     if (lines.length < 2) return lines;
 
     const topRight = this.fitLabel(this.model);
-    const topLeft = this.isWorking ? this.fitLabel(this.renderWorkingLoader(width)) : "";
+    const topLeft = this.isWorking ? this.fitBorderLabel(this.renderWorkingLoader(width)) : "";
 
     const borderColor = (text: string) => this.borderColor(text);
 
@@ -98,6 +98,10 @@ class CompactEditor extends CustomEditor {
 
   private fitLabel(text: string): string {
     return text ? this.uiTheme.fg("dim", ` ${text} `) : "";
+  }
+
+  private fitBorderLabel(text: string): string {
+    return text ? this.borderColor(` ${text} `) : "";
   }
 }
 
