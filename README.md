@@ -53,7 +53,7 @@ Field descriptions:
 
 ### Clear and Start a New Session (`pi-clear-command`)
 
-Provides the `/clear` command, equivalent to `/new`, to start a fresh session.
+Provides the `/clear` command to start a fresh session while keeping the current model and thinking level.
 
 ### Compact Editor (`pi-compact-editor`)
 

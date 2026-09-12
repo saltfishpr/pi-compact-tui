@@ -53,7 +53,7 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 
 ### 清屏新会话（`pi-clear-command`）
 
-提供 `/clear` 命令，等价于 `/new`，开启一个全新会话。
+提供 `/clear` 命令，开启全新会话并继承当前模型和推理档位。
 
 ### 精简编辑器（`pi-compact-editor`）
 
