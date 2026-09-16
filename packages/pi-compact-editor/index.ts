@@ -1,45 +1,25 @@
 import { CustomEditor, type ExtensionAPI, type KeybindingsManager, type Theme } from "@earendil-works/pi-coding-agent";
-import { Loader, visibleWidth, type EditorTheme, type TUI } from "@earendil-works/pi-tui";
+import { visibleWidth, type EditorTheme, type TUI } from "@earendil-works/pi-tui";
+
+interface WorkingStatusIndicator {
+  renderInBorder(width: number): string;
+}
 
 class CompactEditor extends CustomEditor {
   private uiTheme: Theme;
-  private workingLoader: Loader;
-  private isWorking: boolean;
+  private embeddedWorkingStatusIndicator: WorkingStatusIndicator | undefined;
   private model: string;
 
   constructor(tui: TUI, theme: EditorTheme, keybindings: KeybindingsManager, uiTheme: Theme, model = "") {
-    super(tui, theme, keybindings);
+    super(tui, theme, keybindings, { embedWorkingStatus: true });
 
     this.uiTheme = uiTheme;
-    this.workingLoader = new Loader(
-      tui,
-      (text) => text,
-      (text) => text,
-      "",
-      {
-        intervalMs: 80,
-      },
-    );
-    this.workingLoader.stop();
-    this.isWorking = false;
     this.model = model;
   }
 
-  startWorking(message: string = "Working") {
-    this.isWorking = true;
-    this.workingLoader.setMessage(message);
-    this.workingLoader.start();
-  }
-
-  stopWorking() {
-    this.isWorking = false;
-    this.workingLoader.stop();
-    this.workingLoader.setMessage("");
-  }
-
-  setWorkingMessage(message: string) {
-    if (!this.isWorking) return;
-    this.workingLoader.setMessage(message);
+  override setWorkingStatusIndicator(indicator: WorkingStatusIndicator | undefined) {
+    this.embeddedWorkingStatusIndicator = indicator;
+    this.tui.requestRender();
   }
 
   setModel(model: string) {
@@ -51,7 +31,9 @@ class CompactEditor extends CustomEditor {
     if (width <= 0) return "";
     if (width === 1) return this.borderColor("─");
 
-    const topLeft = this.isWorking ? this.fitBorderLabel(this.renderWorkingLoader(width)) : "";
+    const topLeft = this.embeddedWorkingStatusIndicator
+      ? this.fitBorderLabel(this.embeddedWorkingStatusIndicator.renderInBorder(width))
+      : "";
     const topMiddle = hiddenLineCount > 0 ? this.fitBorderLabel(`↑ ${hiddenLineCount} more`) : "";
     const topRight = this.model ? this.uiTheme.fg("dim", ` ${this.model} `) : "";
 
@@ -80,10 +62,6 @@ class CompactEditor extends CustomEditor {
     return border + this.borderColor("─".repeat(width - cursor));
   }
 
-  private renderWorkingLoader(width: number): string {
-    return this.workingLoader.render(width).join("").trim();
-  }
-
   private fitBorderLabel(text: string): string {
     return text ? this.borderColor(` ${text} `) : "";
   }
@@ -96,7 +74,6 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_start", (_event, ctx) => {
     if (!ctx.hasUI) return;
 
-    ctx.ui.setWorkingVisible(false);
     const model = formatModel(ctx.model, pi.getThinkingLevel());
     ctx.ui.setEditorComponent((tui, theme, keybindings) => {
       editor = new CompactEditor(tui, theme, keybindings, ctx.ui.theme, model);
@@ -116,59 +93,57 @@ export default function (pi: ExtensionAPI) {
     editor?.setModel(formatModel(ctx.model, event.level));
   });
 
-  pi.on("agent_start", () => {
+  pi.on("agent_start", (_event, ctx) => {
     runningTools.clear();
-    editor?.startWorking();
+    ctx.ui.setWorkingMessage("Working");
   });
 
-  pi.on("turn_start", () => {
+  pi.on("turn_start", (_event, ctx) => {
     runningTools.clear();
-    editor?.setWorkingMessage("Working");
+    ctx.ui.setWorkingMessage("Working");
   });
 
-  pi.on("message_update", (event) => {
+  pi.on("message_update", (event, ctx) => {
     if (runningTools.size > 0) return;
 
     switch (event.assistantMessageEvent.type) {
       case "thinking_start":
       case "thinking_delta":
       case "thinking_end":
-        editor?.setWorkingMessage("Thinking");
+        ctx.ui.setWorkingMessage("Thinking");
         break;
       case "text_start":
       case "text_delta":
       case "text_end":
-        editor?.setWorkingMessage("Streaming");
+        ctx.ui.setWorkingMessage("Streaming");
         break;
       default:
         break;
     }
   });
 
-  pi.on("tool_execution_start", (event) => {
+  pi.on("tool_execution_start", (event, ctx) => {
     runningTools.set(event.toolCallId, event.toolName);
-    editor?.setWorkingMessage(`Running ${event.toolName}`);
+    ctx.ui.setWorkingMessage(`Running ${event.toolName}`);
   });
 
-  pi.on("tool_execution_end", (event) => {
+  pi.on("tool_execution_end", (event, ctx) => {
     runningTools.delete(event.toolCallId);
     if (runningTools.size === 0) {
-      editor?.setWorkingMessage("Working");
+      ctx.ui.setWorkingMessage("Working");
     } else if (runningTools.size === 1) {
       const toolName = Array.from(runningTools.values())[0];
-      editor?.setWorkingMessage(`Running ${toolName}`);
+      ctx.ui.setWorkingMessage(`Running ${toolName}`);
     } else {
-      editor?.setWorkingMessage(`Running ${runningTools.size} tools`);
+      ctx.ui.setWorkingMessage(`Running ${runningTools.size} tools`);
     }
   });
 
   pi.on("agent_settled", () => {
     runningTools.clear();
-    editor?.stopWorking();
   });
 
   pi.on("session_shutdown", () => {
-    editor?.stopWorking();
     editor = undefined;
   });
 }
