@@ -1,5 +1,4 @@
 import type { Api, Model, ModelThinkingLevel, SimpleStreamOptions } from "@earendil-works/pi-ai";
-import { completeSimple } from "@earendil-works/pi-ai/compat";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 export type AuditRisk = "low" | "medium" | "high";
@@ -36,11 +35,13 @@ export interface AuditCommandOptions {
 
 /**
  * auditCommand asks the configured LLM whether `command` is safe to run in `cwd`.
- * The model is invoked directly via `completeSimple` (no agent loop, no tools),
- * matching pi's `summarize.ts` example pattern.
+ * The model is invoked via the registered provider's `streamSimple` (no agent loop, no tools).
  */
 export async function auditCommand(options: AuditCommandOptions): Promise<AuditResult> {
   const { ctx, command, cwd, model, thinkingLevel, signal } = options;
+
+  const provider = ctx.modelRegistry.getProvider(model.provider);
+  if (!provider) return { kind: "failed", reason: `provider not found: ${model.provider}` };
 
   const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
   if (!auth.ok) return { kind: "failed", reason: auth.error };
@@ -78,7 +79,7 @@ export async function auditCommand(options: AuditCommandOptions): Promise<AuditR
     // "off" 表示关闭思考模式，仅在显式开启时透传 reasoning 配置。
     if (thinkingLevel !== "off") streamOptions.reasoning = thinkingLevel;
 
-    const response = await completeSimple(
+    const stream = provider.streamSimple(
       model,
       {
         systemPrompt: SYSTEM_PROMPT,
@@ -92,6 +93,7 @@ export async function auditCommand(options: AuditCommandOptions): Promise<AuditR
       },
       streamOptions,
     );
+    const response = await stream.result();
 
     if (response.stopReason === "aborted") {
       if (timedOut.value) return { kind: "failed", reason: "audit timed out" };

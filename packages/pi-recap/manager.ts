@@ -1,5 +1,4 @@
 import type { Api, Message, Model, ModelThinkingLevel, SimpleStreamOptions, Usage } from "@earendil-works/pi-ai";
-import { completeSimple } from "@earendil-works/pi-ai/compat";
 import {
   convertToLlm,
   serializeConversation,
@@ -132,6 +131,9 @@ export class RecapManager {
     thinkingLevel: ModelThinkingLevel,
     signal: AbortSignal,
   ): Promise<GenerateResult> {
+    const provider = ctx.modelRegistry.getProvider(model.provider);
+    if (!provider) return { kind: "failed", reason: `provider not found: ${model.provider}` };
+
     const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
     if (!auth.ok) return { kind: "failed", reason: auth.error };
 
@@ -142,7 +144,7 @@ export class RecapManager {
     if (thinkingLevel !== "off") options.reasoning = thinkingLevel;
 
     try {
-      const response = await completeSimple(
+      const stream = provider.streamSimple(
         model,
         {
           systemPrompt: SYSTEM_PROMPT,
@@ -156,6 +158,7 @@ export class RecapManager {
         },
         options,
       );
+      const response = await stream.result();
 
       // 仅保留文本块，忽略思考过程等非展示内容。
       const content = response.content
