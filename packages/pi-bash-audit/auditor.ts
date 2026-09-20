@@ -12,7 +12,6 @@ export type AuditResult =
   | { kind: "failed"; reason: string; text?: string }
   | { kind: "aborted" };
 
-const AUDIT_TIMEOUT_MS = 10_000;
 // 审计只需要一个短 JSON，给一点余量应对 reason 略长的情况。
 const MAX_TOKENS = 256;
 
@@ -34,6 +33,7 @@ export interface AuditCommandOptions {
   cwd: string;
   model: Model<Api>;
   thinkingLevel: ModelThinkingLevel;
+  timeoutMs: number;
   signal?: AbortSignal;
 }
 
@@ -42,14 +42,14 @@ export interface AuditCommandOptions {
  * The model is invoked through the model registry (no agent loop or tools).
  */
 export async function auditCommand(options: AuditCommandOptions): Promise<AuditResult> {
-  const { ctx, command, cwd, model, thinkingLevel, signal } = options;
+  const { ctx, command, cwd, model, thinkingLevel, timeoutMs, signal } = options;
 
   const controller = new AbortController();
   const timedOut = { value: false };
   const timeout = setTimeout(() => {
     timedOut.value = true;
     controller.abort();
-  }, AUDIT_TIMEOUT_MS);
+  }, timeoutMs);
   const onOuterAbort = () => controller.abort();
   signal?.addEventListener("abort", onOuterAbort);
 

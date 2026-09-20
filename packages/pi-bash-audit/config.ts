@@ -22,6 +22,7 @@ export type Rule = z.infer<typeof ruleSchema>;
 
 export const bashAuditConfigSchema = modelSchema.extend({
   enable: z.boolean().default(false),
+  timeoutMs: z.number().int().positive().default(10_000),
   rules: z.array(ruleSchema).default([]),
 });
 

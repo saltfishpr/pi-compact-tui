@@ -149,6 +149,7 @@ export default function (pi: ExtensionAPI) {
       cwd: ctx.cwd,
       model: resolvedModel,
       thinkingLevel,
+      timeoutMs: config.timeoutMs,
       signal: ctx.signal,
     });
 

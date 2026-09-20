@@ -34,6 +34,7 @@ pi install git:github.com/saltfishpr/pi-compact-tui
   "enable": true,
   "model": "anthropic/claude-sonnet-4-5",
   "thinkingLevel": "off",
+  "timeoutMs": 10000,
   "rules": [
     { "command": "pnpm", "args": ["install"], "action": "allow" },
     { "command": "rm", "args": ["-rf"], "action": "prompt" }
@@ -45,6 +46,7 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 
 - `model`：审计模型，格式 `<provider>/<model-id>`；不填则使用当前会话模型。
 - `thinkingLevel`：`off` / `minimal` / `low` / `medium` / `high` / `xhigh` / `max`。
+- `timeoutMs`：模型审计超时时间，单位为毫秒，默认为 `10000`。
 - `rules`：每条规则包含：
   - `command`：命令名（如 `pnpm`）；
   - `args`：需要匹配的参数（如 `["install"]`）；

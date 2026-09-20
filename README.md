@@ -34,6 +34,7 @@ Intercepts bash commands executed by Pi, with two layers of protection:
   "enable": true,
   "model": "anthropic/claude-sonnet-4-5",
   "thinkingLevel": "off",
+  "timeoutMs": 10000,
   "rules": [
     { "command": "pnpm", "args": ["install"], "action": "allow" },
     { "command": "rm", "args": ["-rf"], "action": "prompt" }
@@ -45,6 +46,7 @@ Field descriptions:
 
 - `model`: Audit model in `<provider>/<model-id>` format. Defaults to the current session model when omitted.
 - `thinkingLevel`: `off` / `minimal` / `low` / `medium` / `high` / `xhigh` / `max`.
+- `timeoutMs`: Model audit timeout in milliseconds. Defaults to `10000`.
 - `rules`: Each rule contains:
   - `command`: command name (for example, `pnpm`);
   - `args`: arguments to match (for example, `["install"]`);
