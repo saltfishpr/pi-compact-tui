@@ -1,6 +1,10 @@
 import type { Api, Model, ModelThinkingLevel, ModelsSimpleStreamOptions } from "@earendil-works/pi-ai";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
+import { createLogger } from "../pi-common";
+
+const logger = createLogger("pi-bash-audit");
+
 export type AuditRisk = "low" | "medium" | "high";
 
 export type AuditResult =
@@ -84,6 +88,22 @@ export async function auditCommand(options: AuditCommandOptions): Promise<AuditR
       streamOptions,
     );
     const response = await stream.result();
+    logger.info("audit response", {
+      model: `${model.provider}/${model.id}`,
+      thinkingLevel,
+      stopReason: response.stopReason,
+      usage: response.usage,
+      content: response.content.map((block) => {
+        switch (block.type) {
+          case "text":
+            return { type: block.type, text: block.text };
+          case "thinking":
+            return { type: block.type, thinking: block.thinking, redacted: block.redacted };
+          default:
+            return { type: block.type };
+        }
+      }),
+    });
 
     if (response.stopReason === "aborted") {
       if (timedOut.value) return { kind: "failed", reason: "audit timed out" };
@@ -110,7 +130,13 @@ export async function auditCommand(options: AuditCommandOptions): Promise<AuditR
       parsed = JSON.parse(text) as { risk?: unknown; reason?: unknown };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      return { kind: "failed", reason: `invalid audit JSON: ${message}`, text };
+      logger.warn("invalid audit JSON", {
+        model: `${model.provider}/${model.id}`,
+        thinkingLevel,
+        error: message,
+        text,
+      });
+      return { kind: "failed", reason: message, text };
     }
 
     if (
