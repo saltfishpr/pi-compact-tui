@@ -1,4 +1,4 @@
-import type { Api, Model, ModelThinkingLevel, SimpleStreamOptions } from "@earendil-works/pi-ai";
+import type { Api, Model, ModelThinkingLevel, ModelsSimpleStreamOptions } from "@earendil-works/pi-ai";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 export type AuditRisk = "low" | "medium" | "high";
@@ -35,17 +35,10 @@ export interface AuditCommandOptions {
 
 /**
  * auditCommand asks the configured LLM whether `command` is safe to run in `cwd`.
- * The model is invoked via the registered provider's `streamSimple` (no agent loop, no tools).
+ * The model is invoked through the model registry (no agent loop or tools).
  */
 export async function auditCommand(options: AuditCommandOptions): Promise<AuditResult> {
   const { ctx, command, cwd, model, thinkingLevel, signal } = options;
-
-  const provider = ctx.modelRegistry.getProvider(model.provider);
-  if (!provider) return { kind: "failed", reason: `provider not found: ${model.provider}` };
-
-  const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-  if (!auth.ok) return { kind: "failed", reason: auth.error };
-  if (!auth.apiKey) return { kind: "failed", reason: `no api key for ${model.provider}/${model.id}` };
 
   const controller = new AbortController();
   const timedOut = { value: false };
@@ -57,8 +50,7 @@ export async function auditCommand(options: AuditCommandOptions): Promise<AuditR
   signal?.addEventListener("abort", onOuterAbort);
 
   try {
-    const streamOptions: SimpleStreamOptions = {
-      apiKey: auth.apiKey,
+    const streamOptions: ModelsSimpleStreamOptions = {
       maxTokens: MAX_TOKENS,
       signal: controller.signal,
       onPayload(payload, requestModel) {
@@ -74,12 +66,10 @@ export async function auditCommand(options: AuditCommandOptions): Promise<AuditR
         }
       },
     };
-    if (auth.headers) streamOptions.headers = auth.headers;
-    if (auth.env) streamOptions.env = auth.env;
     // "off" 表示关闭思考模式，仅在显式开启时透传 reasoning 配置。
     if (thinkingLevel !== "off") streamOptions.reasoning = thinkingLevel;
 
-    const stream = provider.streamSimple(
+    const stream = ctx.modelRegistry.streamSimple(
       model,
       {
         systemPrompt: SYSTEM_PROMPT,

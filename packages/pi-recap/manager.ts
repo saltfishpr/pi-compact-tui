@@ -131,20 +131,12 @@ export class RecapManager {
     thinkingLevel: ModelThinkingLevel,
     signal: AbortSignal,
   ): Promise<GenerateResult> {
-    const provider = ctx.modelRegistry.getProvider(model.provider);
-    if (!provider) return { kind: "failed", reason: `provider not found: ${model.provider}` };
-
-    const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-    if (!auth.ok) return { kind: "failed", reason: auth.error };
-
     const options: SimpleStreamOptions = { maxTokens: MAX_TOKENS, signal };
-    if (auth.apiKey) options.apiKey = auth.apiKey;
-    if (auth.headers) options.headers = auth.headers;
     // "off" 表示关闭思考模式，仅在显式开启时透传 reasoning 配置。
     if (thinkingLevel !== "off") options.reasoning = thinkingLevel;
 
     try {
-      const stream = provider.streamSimple(
+      const stream = ctx.modelRegistry.streamSimple(
         model,
         {
           systemPrompt: SYSTEM_PROMPT,
