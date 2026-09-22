@@ -160,14 +160,15 @@ class AgentThread {
       if (this.aborted) return this.buildResult("aborted");
 
       const maxTurns = this.request.profile.maxTurns;
-      session.agent.shouldStopAfterTurn = () => {
+      session.agent.finishTurn = ({ message }) => {
+        if (message.stopReason === "error" || message.stopReason === "aborted") return;
+
         this.turns++;
         this.publish();
         if (maxTurns && this.turns >= maxTurns) {
           this.turnLimitReached = true;
-          return true;
+          return { action: "end" };
         }
-        return false;
       };
 
       const unsubscribe = session.subscribe((event) => this.onEvent(event));
