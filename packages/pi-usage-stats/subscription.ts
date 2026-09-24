@@ -31,7 +31,7 @@ export function formatSubscriptionStatus(
       const quota = `${formatWindow(window.windowSeconds)} ${remainingPercent}% left`;
       const coloredQuota = colorQuota(theme, quota, window.usedPercent);
       if (options.showResetTime === false || window.resetAtMs === undefined) return coloredQuota;
-      return `${coloredQuota} ${theme.fg("dim", `↻ ${formatRelativeTime(window.resetAtMs, options.now)}`)}`;
+      return `${coloredQuota} ${theme.fg("dim", `🔄${formatRelativeTime(window.resetAtMs, options.now)}`)}`;
     })
     .join(theme.fg("dim", " • "));
 }
@@ -58,7 +58,7 @@ function formatRelativeTime(resetAt: number, now: number): string {
   const days = Math.floor(totalMinutes / 1_440);
   const hours = Math.floor((totalMinutes % 1_440) / 60);
   const minutes = totalMinutes % 60;
-  if (days > 0) return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
-  if (hours > 0) return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  if (days > 0) return hours > 0 ? `${days}d${hours}h` : `${days}d`;
+  if (hours > 0) return minutes > 0 ? `${hours}h${minutes}m` : `${hours}h`;
   return `${minutes}m`;
 }
