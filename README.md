@@ -163,21 +163,22 @@ Automatically trusts projects based on their Git `origin` remote, skipping Pi's 
 
 Displays provider usage for the current model in the status bar:
 
-- **openai-codex**: Remaining subscription quota in the 5-hour / 7-day rate-limit windows.
+- **openai-codex**: Remaining subscription quota and relative reset time in the 5-hour / 7-day rate-limit windows.
 - **deepseek**: Account balance.
 - **zai-coding-cn** (Zhipu): Account balance.
 
-**Configuration**: Edit `~/.pi/agent/extensions/provider-stats.json` to disable individual providers as needed or set the balance currency:
+**Configuration**: Edit `~/.pi/agent/extensions/provider-stats.json` to disable individual providers, hide subscription reset times, or set the balance currency:
 
 ```json
 {
   "providers": {
+    "openai-codex": { "showResetTime": false },
     "deepseek": { "enabled": true, "currency": "CNY" }
   }
 }
 ```
 
-Providers not configured are enabled by default.
+Providers and subscription reset times are enabled by default.
 
 ### Web Search (`pi-web-search`)
 

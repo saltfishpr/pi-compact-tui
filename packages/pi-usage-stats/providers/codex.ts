@@ -1,5 +1,6 @@
-import { readStoredCredential, type ExtensionContext, type Theme } from "@earendil-works/pi-coding-agent";
+import { readStoredCredential, type ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { ProviderStatsAdapter } from ".";
+import { formatSubscriptionStatus, type SubscriptionUsage } from "../subscription";
 
 const PROVIDER = "openai-codex";
 const USAGE_URL = "https://chatgpt.com/backend-api/wham/usage";
@@ -8,6 +9,8 @@ const REQUEST_TIMEOUT_MS = 30_000;
 interface CodexRateWindow {
   limit_window_seconds: number;
   used_percent?: number | string;
+  reset_at?: number | string;
+  reset_after_seconds?: number | string;
 }
 
 interface CodexUsageResponse {
@@ -18,37 +21,35 @@ interface CodexUsageResponse {
   credits?: { unlimited?: boolean };
 }
 
-function formatWindow(seconds: number): string {
-  if (seconds % 86_400 === 0) return `${seconds / 86_400}d`;
-  if (seconds % 3_600 === 0) return `${seconds / 3_600}h`;
-  return `${Math.round(seconds / 60)}m`;
+function parseNumber(value: number | string | undefined): number | undefined {
+  const number = typeof value === "number" ? value : typeof value === "string" ? Number(value) : undefined;
+  return number !== undefined && Number.isFinite(number) ? number : undefined;
 }
 
 function parsePercent(value: number | string | undefined): number | undefined {
-  const percent = typeof value === "number" ? value : typeof value === "string" ? Number(value) : undefined;
-  if (percent === undefined || !Number.isFinite(percent)) return undefined;
-  return Math.min(100, Math.max(0, percent));
+  const percent = parseNumber(value);
+  return percent === undefined ? undefined : Math.min(100, Math.max(0, percent));
 }
 
-function formatUsage(theme: Theme, usage: CodexUsageResponse): string {
-  const windows = [usage.rate_limit?.primary_window, usage.rate_limit?.secondary_window].filter(
-    (window): window is CodexRateWindow => window != null,
-  );
+function parseResetAt(window: CodexRateWindow, fetchedAt: number): number | undefined {
+  const resetAt = parseNumber(window.reset_at);
+  if (resetAt !== undefined && resetAt > 0) return resetAt * 1_000;
 
-  if (usage.credits?.unlimited === true || windows.every((window) => parsePercent(window.used_percent) === undefined)) {
-    return theme.fg("success", "unlimited");
-  }
+  const resetAfterSeconds = parseNumber(window.reset_after_seconds);
+  if (resetAfterSeconds !== undefined && resetAfterSeconds >= 0) return fetchedAt + resetAfterSeconds * 1_000;
+  return undefined;
+}
 
-  return windows
-    .map((window) => {
-      const usedPercent = parsePercent(window.used_percent);
-      const remainingPercent = usedPercent === undefined ? "?" : (100 - usedPercent).toFixed(0);
-      const text = `${formatWindow(window.limit_window_seconds)} ${remainingPercent}% left`;
-      if (usedPercent !== undefined && usedPercent > 90) return theme.fg("error", text);
-      if (usedPercent !== undefined && usedPercent > 70) return theme.fg("warning", text);
-      return theme.fg("success", text);
-    })
-    .join(theme.fg("dim", " • "));
+function normalizeUsage(usage: CodexUsageResponse, fetchedAt: number): SubscriptionUsage {
+  const windows = [usage.rate_limit?.primary_window, usage.rate_limit?.secondary_window]
+    .filter((window): window is CodexRateWindow => window != null)
+    .map((window) => ({
+      windowSeconds: window.limit_window_seconds,
+      usedPercent: parsePercent(window.used_percent),
+      resetAtMs: parseResetAt(window, fetchedAt),
+    }));
+
+  return { unlimited: usage.credits?.unlimited, windows };
 }
 
 function buildHeaders(apiKey: string): Record<string, string> {
@@ -67,7 +68,7 @@ export const codexAdapter: ProviderStatsAdapter = {
   provider: PROVIDER,
   statusKey: "codex-stats",
   kind: "subscription",
-  async fetch(ctx: ExtensionContext, signal: AbortSignal): Promise<string | undefined> {
+  async fetch(ctx: ExtensionContext, signal: AbortSignal, config): Promise<string | undefined> {
     const apiKey = await ctx.modelRegistry.getApiKeyForProvider(PROVIDER);
     if (signal.aborted || !apiKey) return undefined;
 
@@ -78,6 +79,12 @@ export const codexAdapter: ProviderStatsAdapter = {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const usage = (await response.json()) as CodexUsageResponse;
-    return signal.aborted ? undefined : formatUsage(ctx.ui.theme, usage);
+    if (signal.aborted) return undefined;
+
+    const fetchedAt = Date.now();
+    return formatSubscriptionStatus(ctx.ui.theme, normalizeUsage(usage, fetchedAt), {
+      showResetTime: config?.showResetTime ?? true,
+      now: fetchedAt,
+    });
   },
 };

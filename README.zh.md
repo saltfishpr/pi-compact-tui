@@ -163,21 +163,22 @@ maxTurns: 30
 
 在状态栏展示当前模型的 provider 用量：
 
-- **openai-codex**：订阅限流窗口（5h / 7d 剩余额度）。
+- **openai-codex**：订阅限流窗口（5h / 7d 剩余额度和相对重置时间）。
 - **deepseek**：账户余额。
 - **zai-coding-cn**（智谱）：账户余额。
 
-**配置**：编辑 `~/.pi/agent/extensions/provider-stats.json`，按需关闭某个 provider 或指定余额币种：
+**配置**：编辑 `~/.pi/agent/extensions/provider-stats.json`，按需关闭某个 provider、隐藏订阅重置时间或指定余额币种：
 
 ```json
 {
   "providers": {
+    "openai-codex": { "showResetTime": false },
     "deepseek": { "enabled": true, "currency": "CNY" }
   }
 }
 ```
 
-未配置的 provider 默认启用。
+未配置的 provider 默认启用，订阅重置时间默认展示。
 
 ### 联网搜索（`pi-web-search`）
 
