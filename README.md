@@ -72,7 +72,12 @@ Replaces the default footer with a configurable, multi-line status bar. It suppo
   "separator": " ",
   "lines": [
     {
-      "left": ["pwd", "branch", "sessionName"],
+      "left": [
+        "pwd",
+        { "kind": "literal", "value": "|", "color": "dim" },
+        "branch",
+        "sessionName"
+      ],
       "right": ["cacheHitRate", "cost", "context"]
     },
     { "left": ["extensionStatuses"] }
@@ -80,8 +85,10 @@ Replaces the default footer with a configurable, multi-line status bar. It suppo
 }
 ```
 
-- `lines`: One object per line. `left` and `right` are arrays of item names aligned to their respective sides.
+- `separator`: The default text inserted between non-empty items on the same side.
+- `lines`: One object per line. `left` and `right` are arrays of items aligned to their respective sides.
 - Available item names: `pwd`, `branch`, `sessionName`, `inputTokens`, `outputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `cacheHitRate`, `cost`, `context`, `provider`, `model`, `thinkingLevel`, `extensionStatuses`, and `status:<key>` (references a status registered by another extension, such as `status:codex-stats`).
+- Insert `{ "kind": "literal", "value": "|", "color": "dim" }` in an item array to display custom text. `color` accepts a Pi theme foreground color name and falls back to `dim` when invalid. The configured `separator` is still inserted between the literal and adjacent items.
 
 ### Input History (`pi-history`)
 

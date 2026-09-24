@@ -3,11 +3,12 @@ import type {
   ExtensionContext,
   ReadonlyFooterDataProvider,
   Theme,
+  ThemeColor,
 } from "@earendil-works/pi-coding-agent";
 import { type Component, truncateToWidth, type TUI, visibleWidth } from "@earendil-works/pi-tui";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { addUsageToTotals, createUsageTotals, type UsageTotals } from "../pi-common";
-import { type FooterConfig, getStatusKey, loadConfig } from "./config";
+import { type FooterConfig, type FooterElement, getStatusKey, loadConfig } from "./config";
 
 function sanitizeStatusText(text: string): string {
   return text
@@ -88,6 +89,7 @@ class ConfigurableFooter implements Component {
       this.config.lines
         .flatMap((line) => [...(line.left ?? []), ...(line.right ?? [])])
         .flatMap((element) => {
+          if (typeof element !== "string") return [];
           const key = getStatusKey(element);
           return key === undefined ? [] : [key];
         }),
@@ -180,7 +182,16 @@ class ConfigurableFooter implements Component {
     const separator = this.config.separator;
     const lineConfigs = this.config.lines;
 
-    const resolveElement = (element: string): string => {
+    const resolveElement = (element: FooterElement): string => {
+      if (typeof element !== "string") {
+        const color = element.color as ThemeColor;
+        try {
+          this.theme.getFgAnsi(color);
+          return this.theme.fg(color, element.value);
+        } catch {
+          return this.theme.fg("dim", element.value);
+        }
+      }
       const statusKey = getStatusKey(element);
       if (statusKey !== undefined) return sanitizeStatusText(extensionStatuses.get(statusKey) ?? "");
       return built[element] ?? "";

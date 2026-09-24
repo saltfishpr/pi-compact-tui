@@ -72,7 +72,12 @@ pi install git:github.com/saltfishpr/pi-compact-tui
   "separator": " ",
   "lines": [
     {
-      "left": ["pwd", "branch", "sessionName"],
+      "left": [
+        "pwd",
+        { "kind": "literal", "value": "|", "color": "dim" },
+        "branch",
+        "sessionName"
+      ],
       "right": ["cacheHitRate", "cost", "context"]
     },
     { "left": ["extensionStatuses"] }
@@ -80,8 +85,10 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 }
 ```
 
-- `lines`：每行一个对象，`left` 与 `right` 是元素名数组，分别靠左、靠右排列。
+- `separator`：连接同侧非空元素的默认文本。
+- `lines`：每行一个对象，`left` 与 `right` 是元素数组，分别靠左、靠右排列。
 - 可用元素名：`pwd`、`branch`、`sessionName`、`inputTokens`、`outputTokens`、`cacheReadTokens`、`cacheWriteTokens`、`cacheHitRate`、`cost`、`context`、`provider`、`model`、`thinkingLevel`、`extensionStatuses`，以及 `status:<key>`（引用其他扩展注册的状态，如 `status:codex-stats`）。
+- 可在元素数组中插入 `{ "kind": "literal", "value": "|", "color": "dim" }` 显示自定义文本；`color` 使用 Pi theme 的 foreground color 名称，无效时回退到 `dim`。literal 与相邻元素之间仍会插入 `separator`。
 
 ### 输入历史（`pi-history`）
 

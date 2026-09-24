@@ -27,9 +27,24 @@ export function getStatusKey(element: string): string | undefined {
   return element.startsWith(STATUS_ELEMENT_PREFIX) ? element.slice(STATUS_ELEMENT_PREFIX.length) : undefined;
 }
 
+export const literalElementSchema = z
+  .object({
+    kind: z.literal("literal"),
+    value: z
+      .string()
+      .min(1)
+      .refine((value) => !/[\r\n\t]/.test(value), "Literal value must be single-line text"),
+    color: z.string(),
+  })
+  .strict();
+
+export const footerElementSchema = z.union([z.string(), literalElementSchema]);
+
+export type FooterElement = z.infer<typeof footerElementSchema>;
+
 export const lineConfigSchema = z.object({
-  left: z.array(z.string()).optional(),
-  right: z.array(z.string()).optional(),
+  left: z.array(footerElementSchema).optional(),
+  right: z.array(footerElementSchema).optional(),
 });
 
 export type LineConfig = z.infer<typeof lineConfigSchema>;
