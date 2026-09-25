@@ -1,5 +1,5 @@
 import type { Model, ModelThinkingLevel } from "@earendil-works/pi-ai";
-import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-agent";
+import type { AgentSession, AgentSessionEvent, ModelRuntime } from "@earendil-works/pi-coding-agent";
 
 import { addUsageToTotals, createUsageTotals, type UsageTotals } from "../pi-common";
 import type { AgentProfile } from "./agents";
@@ -73,6 +73,7 @@ class AgentThread {
   constructor(
     private readonly request: SpawnRequest,
     private readonly cwd: string,
+    private readonly modelRuntime: ModelRuntime | undefined,
     private readonly emit: (event: SubagentManagerEvent) => void,
   ) {
     this.id = request.id;
@@ -141,7 +142,13 @@ class AgentThread {
   private async run(): Promise<SpawnResult> {
     const { profile, task, model, thinkingLevel } = this.request;
 
-    const session = await createChildSession({ cwd: this.cwd, profile, model, thinkingLevel });
+    const session = await createChildSession({
+      cwd: this.cwd,
+      profile,
+      model,
+      modelRuntime: this.modelRuntime,
+      thinkingLevel,
+    });
     this.session = session;
     try {
       await session.bindExtensions({
@@ -247,6 +254,7 @@ export class SubagentManager {
   constructor(
     private readonly cwd: string,
     private readonly maxConcurrent: number,
+    private readonly modelRuntime: ModelRuntime | undefined,
   ) {}
 
   spawn(req: SpawnRequest, signal?: AbortSignal): Promise<SpawnResult> {
@@ -254,7 +262,7 @@ export class SubagentManager {
       return Promise.reject(new Error("Subagent manager is shutting down"));
     }
 
-    const thread = new AgentThread(req, this.cwd, (event) => this.emit(event));
+    const thread = new AgentThread(req, this.cwd, this.modelRuntime, (event) => this.emit(event));
     this.pending.push(thread);
     this.emit({ type: "upsert", snapshot: thread.snapshot() });
 

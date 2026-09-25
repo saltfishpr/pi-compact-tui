@@ -5,6 +5,7 @@ import {
   type AgentToolResult,
   type ExtensionAPI,
   type ExtensionContext,
+  type ModelRuntime,
 } from "@earendil-works/pi-coding-agent";
 import { Box, Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
 
@@ -17,6 +18,11 @@ import { SubagentManager, type SpawnStopReason } from "./manager";
 import { createSubagentWidget } from "./widget";
 
 const WIDGET_KEY = "pi-subagent";
+
+function getModelRuntime(ctx: ExtensionContext): ModelRuntime | undefined {
+  // ModelRegistry does not expose its runtime publicly yet; fall back gracefully if Pi changes its internals.
+  return (ctx.modelRegistry as unknown as { runtime?: ModelRuntime }).runtime;
+}
 
 function reportDiagnostics(ctx: ExtensionContext, diagnostics: AgentDiagnostic[]): void {
   if (diagnostics.length === 0) return;
@@ -220,7 +226,7 @@ export default function (pi: ExtensionAPI) {
     if (catalog.agents.length === 0) return;
     agents = applyAgentOverrides(catalog.agents, config);
 
-    manager = new SubagentManager(ctx.cwd, config.maxConcurrent);
+    manager = new SubagentManager(ctx.cwd, config.maxConcurrent, getModelRuntime(ctx));
     ctx.ui.setWidget(WIDGET_KEY, createSubagentWidget(manager), { placement: "aboveEditor" });
   });
 

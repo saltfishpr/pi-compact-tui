@@ -5,6 +5,7 @@ import {
   DefaultResourceLoader,
   getAgentDir,
   SessionManager,
+  type ModelRuntime,
 } from "@earendil-works/pi-coding-agent";
 
 import type { AgentProfile } from "./agents";
@@ -16,11 +17,12 @@ export interface CreateChildSessionOptions {
   cwd: string;
   profile: AgentProfile;
   model: Model<any>;
+  modelRuntime?: ModelRuntime;
   thinkingLevel: ModelThinkingLevel;
 }
 
 export async function createChildSession(options: CreateChildSessionOptions): Promise<AgentSession> {
-  const { cwd, profile, model, thinkingLevel } = options;
+  const { cwd, profile, model, modelRuntime, thinkingLevel } = options;
 
   const skillWhitelist = new Set(profile.skills ?? []);
   let availableSkills: string[] = [];
@@ -44,6 +46,7 @@ export async function createChildSession(options: CreateChildSessionOptions): Pr
   const { session } = await createAgentSession({
     cwd,
     model,
+    modelRuntime,
     thinkingLevel,
     tools,
     resourceLoader: loader,
