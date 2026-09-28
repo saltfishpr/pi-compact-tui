@@ -1,15 +1,21 @@
 import { ModelThinkingLevel } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-let inheritedSessionSettings:
-  | { provider: string; modelId: string; thinkingLevel: NonNullable<ModelThinkingLevel> }
-  | undefined;
+type InheritedSessionSettings = {
+  previousSessionFile: string | undefined;
+  provider: string;
+  modelId: string;
+  thinkingLevel: NonNullable<ModelThinkingLevel>;
+};
+
+let inheritedSessionSettings: InheritedSessionSettings | undefined;
 
 export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (event, ctx) => {
     if (event.reason !== "new" || !inheritedSessionSettings) return;
 
     const settings = inheritedSessionSettings;
+    if (event.previousSessionFile !== settings.previousSessionFile) return;
     inheritedSessionSettings = undefined;
 
     const model = ctx.modelRegistry.find(settings.provider, settings.modelId);
@@ -26,13 +32,18 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      inheritedSessionSettings = {
+      const settings: InheritedSessionSettings = {
+        previousSessionFile: ctx.sessionManager.getSessionFile(),
         provider: ctx.model.provider,
         modelId: ctx.model.id,
         thinkingLevel: ctx.thinkingLevel,
       };
-      const result = await ctx.newSession();
-      if (result.cancelled) inheritedSessionSettings = undefined;
+      inheritedSessionSettings = settings;
+      try {
+        await ctx.newSession();
+      } finally {
+        if (inheritedSessionSettings === settings) inheritedSessionSettings = undefined;
+      }
     },
   });
 }
