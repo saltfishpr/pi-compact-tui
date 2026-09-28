@@ -1,75 +1,52 @@
-import { Type } from "@earendil-works/pi-ai";
-import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { truncateHead } from "../pi-common";
-import { loadConfig } from "./config";
-import { searchWeb } from "./search";
-import { SearchResponse } from "./types";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { createLogger } from "../pi-common";
+import { loadConfig, type WebSearchConfig } from "./config";
+import { createBigModelSearchProvider } from "./providers/bigmodel";
+import { registerWebSearchTool } from "./tool";
+import { REGISTER_SEARCH_PROVIDER_EVENT, type SearchProvider, type SearchProviderId } from "./types";
+
+const logger = createLogger("pi-web-search");
 
 export default function (pi: ExtensionAPI) {
-  let config = loadConfig();
+  const providers = new Map<SearchProviderId, SearchProvider>();
+  let config: WebSearchConfig = { maxResults: 5, providers: {} };
+  registerWebSearchTool(pi, providers, () => config);
 
-  pi.registerTool({
-    name: "web_search",
-    label: "Web Search",
-    description:
-      "Search the web for current or external information. Returns up to 10 results with titles, URLs, and snippets.",
-    promptSnippet: "Search the web for current or external information",
-    promptGuidelines: [
-      "Use web_search when the answer needs current, external, or independently verifiable information.",
-      "Use URLs returned by web_search as citations when answering from search results.",
-    ],
-    parameters: Type.Object({
-      query: Type.String({
-        minLength: 1,
-        description: "The web search query.",
-      }),
-      maxResults: Type.Optional(
-        Type.Integer({
-          minimum: 1,
-          maximum: 10,
-          description: "Maximum number of results to return. Defaults to the configured value.",
-        }),
-      ),
-    }),
-    async execute(_toolCallId, params, signal) {
-      const response = await searchWeb(config, params.query, params.maxResults, signal ?? new AbortController().signal);
-      const text = formatResults(response);
-      const truncation = truncateHead(text, {
-        maxBytes: DEFAULT_MAX_BYTES,
-        maxLines: DEFAULT_MAX_LINES,
-      });
+  pi.events.on(REGISTER_SEARCH_PROVIDER_EVENT, (data) => {
+    if (!isSearchProvider(data)) {
+      logger.warn(`Ignoring invalid ${REGISTER_SEARCH_PROVIDER_EVENT} payload`);
+      return;
+    }
+    if (providers.has(data.id)) {
+      logger.warn(`Search provider '${data.id}' is already registered`);
+      return;
+    }
+    providers.set(data.id, data);
+    registerWebSearchTool(pi, providers, () => config); // refresh tool with new provider
 
-      return {
-        content: [{ type: "text", text: truncation.content }],
-        details: response,
-      };
-    },
+    if (!pi.getActiveTools().includes("web_search")) {
+      pi.setActiveTools([...pi.getActiveTools(), "web_search"]);
+    }
   });
 
   pi.on("session_start", () => {
     config = loadConfig();
 
-    const activeTools = pi.getActiveTools();
-    if (!config.provider) {
-      // 如果没有配置 provider，移除 web_search 工具
-      pi.setActiveTools(activeTools.filter((toolName) => toolName !== "web_search"));
-    } else {
-      // 如果配置了 provider，添加 web_search 工具
-      if (!activeTools.includes("web_search")) {
-        pi.setActiveTools([...activeTools, "web_search"]);
-      }
+    if (config.providers.bigmodel) {
+      pi.events.emit(REGISTER_SEARCH_PROVIDER_EVENT, createBigModelSearchProvider(config.providers.bigmodel));
+    }
+
+    const active = pi.getActiveTools();
+    if (providers.size === 0) {
+      pi.setActiveTools(active.filter((name) => name !== "web_search"));
+    } else if (!active.includes("web_search")) {
+      pi.setActiveTools([...active, "web_search"]);
     }
   });
 }
 
-function formatResults(response: Awaited<SearchResponse>): string {
-  if (response.results.length === 0) {
-    return `No ${response.provider} results found for: ${response.query}`;
-  }
-
-  const results = response.results.map((result, index) => {
-    const snippet = result.snippet ? `\n${result.snippet}` : "";
-    return `${index + 1}. ${result.title}\n${result.url}${snippet}`;
-  });
-  return `Search results for: ${response.query}\n\n${results.join("\n\n")}`;
+function isSearchProvider(value: unknown): value is SearchProvider {
+  if (typeof value !== "object" || value === null) return false;
+  const provider = value as Partial<SearchProvider>;
+  return typeof provider.id === "string" && provider.id.trim().length > 0 && typeof provider.search === "function";
 }

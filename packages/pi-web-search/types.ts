@@ -1,4 +1,4 @@
-export type SearchProviderId = "bigmodel" | "brave" | "tavily";
+export type SearchProviderId = string;
 
 export interface SearchRequest {
   query: string;
@@ -11,13 +11,10 @@ export interface SearchResult {
   snippet: string;
 }
 
-export interface SearchResponse {
-  provider: SearchProviderId;
-  query: string;
-  results: SearchResult[];
-}
+/** Emit a SearchProvider on this channel during session_start to register it for the current session. */
+export const REGISTER_SEARCH_PROVIDER_EVENT = "pi-web-search:register:v1";
 
-export interface SearchProvider<Config> {
+export interface SearchProvider {
   readonly id: SearchProviderId;
-  search(config: Config, request: SearchRequest, signal: AbortSignal): Promise<SearchResponse>;
+  search(request: SearchRequest, signal: AbortSignal): Promise<SearchResult[]>;
 }

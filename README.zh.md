@@ -189,9 +189,15 @@ maxTurns: 30
 
 ### 联网搜索（`pi-web-search`）
 
-提供 `web_search` 工具，用于查询需要时效性、外部信息或独立验证的信息。搜索结果包含标题、URL 和摘要，方便 Pi 在回答中引用来源。配置 provider 后工具自动启用。
+提供 `web_search` 工具，用于查询需要时效性或外部验证的信息。结果包含标题、URL 和摘要，方便引用来源。注册 search provider 后，工具自动启用。
 
-**配置**：编辑 `~/.pi/agent/extensions/web-search.json`，填写要使用的 provider 的 API Key：
+**配置**：在 `~/.pi/agent/extensions/web-search.json` 中用 `provider` 指定默认 provider ID；`maxResults` 指定默认返回数量，范围 1～10，默认为 5。调用 `web_search` 时可覆盖这两个值；未配置默认 provider 时，调用必须指定 `provider`。
+
+接入其他搜索服务的方法见[自定义 provider 开发指南](packages/pi-web-search/docs/PROVIDERS.zh.md)。
+
+#### BigModel
+
+内置 BigModel 联网搜索 provider。要启用它，在 `~/.pi/agent/extensions/web-search.json` 中填写 API Key：
 
 ```json
 {
@@ -206,11 +212,9 @@ maxTurns: 30
 }
 ```
 
-- `provider`：当前使用的 provider，支持 `bigmodel`、`brave`、`tavily`。
-- `maxResults`：每次搜索默认返回的结果数，范围 1～10，默认 5。
-- `providers.bigmodel`：必须填写 `apiKey`；`searchEngine` 可选 `search_std`（默认）、`search_pro`、`search_pro_sogou`、`search_pro_quark`。
-- `providers.brave`：必须填写 `apiKey`。
-- `providers.tavily`：必须填写 `apiKey`；`searchDepth` 可选 `basic`（默认）或 `advanced`。
+`searchEngine` 可选 `search_std`（默认）、`search_pro`、`search_pro_sogou` 或 `search_pro_quark`。
+
+**从 Brave 或 Tavily 迁移**：内置的 Brave、Tavily provider 已移除。原有的 `provider: "brave"` 或 `provider: "tavily"` 配置不会启用搜索。请改用 BigModel，或按上面的开发指南注册自定义 provider。
 
 ## License
 

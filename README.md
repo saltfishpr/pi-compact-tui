@@ -189,9 +189,15 @@ Providers and subscription reset times are enabled by default.
 
 ### Web Search (`pi-web-search`)
 
-Adds a `web_search` tool for finding current or externally verifiable information. Search results include titles, URLs, and snippets, so Pi can cite their sources. The tool is enabled after you configure a provider.
+Adds a `web_search` tool for finding current or externally verifiable information. Results include titles, URLs, and snippets for citations. The tool becomes available when a search provider is registered.
 
-**Configuration**: Edit `~/.pi/agent/extensions/web-search.json` and add the API key for the provider you want to use:
+**Configuration**: In `~/.pi/agent/extensions/web-search.json`, set `provider` to the default provider ID. `maxResults` sets the default result limit (1–10; defaults to 5). A `web_search` call can override either value. Without a default provider, the call must specify `provider`.
+
+For other search services, see the [custom provider guide](packages/pi-web-search/docs/PROVIDERS.md).
+
+#### BigModel
+
+Built-in provider for BigModel web search. To enable it, add your API key to `~/.pi/agent/extensions/web-search.json`:
 
 ```json
 {
@@ -206,11 +212,9 @@ Adds a `web_search` tool for finding current or externally verifiable informatio
 }
 ```
 
-- `provider`: Active provider: `bigmodel`, `brave`, or `tavily`.
-- `maxResults`: Default number of results returned per search, from 1 to 10; defaults to 5.
-- `providers.bigmodel`: `apiKey` is required; `searchEngine` can be `search_std` (default), `search_pro`, `search_pro_sogou`, or `search_pro_quark`.
-- `providers.brave`: `apiKey` is required.
-- `providers.tavily`: `apiKey` is required; `searchDepth` can be `basic` (default) or `advanced`.
+`searchEngine` can be `search_std` (default), `search_pro`, `search_pro_sogou`, or `search_pro_quark`.
+
+**Migrating from Brave or Tavily:** These built-in providers are no longer available. Existing `provider: "brave"` or `provider: "tavily"` settings will not enable search. Switch to BigModel or register a custom provider using the guide above.
 
 ## License
 
