@@ -25,6 +25,14 @@ export default function (pi: ExtensionAPI) {
 
 The event payload must have a nonempty, unique `id` and a `search` function. `request.query` is the search text; `request.maxResults` is the requested result limit (1–10). Return search results in relevance order with `title`, `url`, and `snippet` strings. Use the provided `signal` for cancellation. The tool caps the returned list at `maxResults` and presents snippets, not full page contents. Registration with an ID already in use is ignored.
 
+To remove a provider during the current session, emit `pi-web-search:unregister:v1` with its ID:
+
+```typescript
+pi.events.emit("pi-web-search:unregister:v1", { id: "my-search" });
+```
+
+Unknown IDs are ignored. If no providers remain, `web_search` is disabled; otherwise its provider choices are updated.
+
 To make this provider the default, set `"provider": "my-search"` in `~/.pi/agent/extensions/web-search.json`. Without a default, calls must pass `provider: "my-search"`. Keep credentials and service-specific settings in your own extension's configuration: the `providers` object in `web-search.json` only configures the built-in BigModel provider.
 
 Brave and Tavily are no longer built in. Existing configurations that select either service require a separately registered provider with the corresponding ID, or a switch to BigModel.

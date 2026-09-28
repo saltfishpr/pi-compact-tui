@@ -3,7 +3,12 @@ import { createLogger } from "../pi-common";
 import { loadConfig, type WebSearchConfig } from "./config";
 import { createBigModelSearchProvider } from "./providers/bigmodel";
 import { registerWebSearchTool } from "./tool";
-import { REGISTER_SEARCH_PROVIDER_EVENT, type SearchProvider, type SearchProviderId } from "./types";
+import {
+  REGISTER_SEARCH_PROVIDER_EVENT,
+  UNREGISTER_SEARCH_PROVIDER_EVENT,
+  type SearchProvider,
+  type SearchProviderId,
+} from "./types";
 
 const logger = createLogger("pi-web-search");
 
@@ -22,10 +27,23 @@ export default function (pi: ExtensionAPI) {
       return;
     }
     providers.set(data.id, data);
-    registerWebSearchTool(pi, providers, () => config); // refresh tool with new provider
 
+    registerWebSearchTool(pi, providers, () => config); // refresh tool with new provider
     if (!pi.getActiveTools().includes("web_search")) {
       pi.setActiveTools([...pi.getActiveTools(), "web_search"]);
+    }
+  });
+
+  pi.events.on(UNREGISTER_SEARCH_PROVIDER_EVENT, (data) => {
+    if (!isSearchProviderId(data)) {
+      logger.warn(`Ignoring invalid ${UNREGISTER_SEARCH_PROVIDER_EVENT} payload`);
+      return;
+    }
+    if (!providers.delete(data.id)) return;
+
+    registerWebSearchTool(pi, providers, () => config); // refresh provider choices
+    if (providers.size === 0) {
+      pi.setActiveTools(pi.getActiveTools().filter((name) => name !== "web_search"));
     }
   });
 
@@ -45,8 +63,12 @@ export default function (pi: ExtensionAPI) {
   });
 }
 
-function isSearchProvider(value: unknown): value is SearchProvider {
+function isSearchProviderId(value: unknown): value is { id: SearchProviderId } {
   if (typeof value !== "object" || value === null) return false;
-  const provider = value as Partial<SearchProvider>;
-  return typeof provider.id === "string" && provider.id.trim().length > 0 && typeof provider.search === "function";
+  const provider = value as { id?: unknown };
+  return typeof provider.id === "string" && provider.id.trim().length > 0;
+}
+
+function isSearchProvider(value: unknown): value is SearchProvider {
+  return isSearchProviderId(value) && typeof (value as Partial<SearchProvider>).search === "function";
 }
