@@ -57,13 +57,10 @@ export default function (pi: ExtensionAPI) {
     const controller = new AbortController();
     inflight = controller;
 
-    const lastFetchAt = Date.now();
-    statusCache.set(adapter, { lastFetchAt, status: undefined });
-
     try {
       const status = await adapter.fetch(ctx, controller.signal, providerConfig);
       if (controller.signal.aborted || ctx.model?.provider !== adapter.provider) return;
-      statusCache.set(adapter, { lastFetchAt, status });
+      statusCache.set(adapter, { lastFetchAt: Date.now(), status });
       ctx.ui.setStatus(adapter.statusKey, status);
     } catch (error) {
       if (controller.signal.aborted || ctx.model?.provider !== adapter.provider) return;
