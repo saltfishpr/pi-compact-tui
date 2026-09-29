@@ -46,6 +46,7 @@ export interface SpawnRequest {
   task: string;
   model: Model<any>;
   thinkingLevel: ModelThinkingLevel;
+  prepare: (signal: AbortSignal) => Promise<string>;
 }
 
 /** 一个子任务派发的运行时单元：拥有隔离子会话并驱动其生命周期。 */
@@ -61,6 +62,7 @@ class AgentThread {
   readonly settled: Promise<SpawnResult>;
 
   private session?: AgentSession;
+  private readonly controller = new AbortController();
   private aborted = false;
   private turnLimitReached = false;
   private lastStopReason = "";
@@ -105,13 +107,15 @@ class AgentThread {
     try {
       this.settle(await this.run());
     } catch (error) {
-      this.fail(error);
+      if (this.aborted) this.settle(this.buildResult("aborted"));
+      else this.fail(error);
     }
   }
 
   /** 运行中的线程：中止子会话；`run()` 会观察到 aborted 并以 aborted 结果收尾。 */
   async abort(): Promise<void> {
     this.aborted = true;
+    this.controller.abort();
     await this.session?.abort();
   }
 
@@ -141,6 +145,8 @@ class AgentThread {
 
   private async run(): Promise<SpawnResult> {
     const { profile, task, model, thinkingLevel } = this.request;
+    const material = await this.request.prepare(this.controller.signal);
+    if (this.aborted) return this.buildResult("aborted");
 
     const session = await createChildSession({
       cwd: this.cwd,
@@ -180,7 +186,7 @@ class AgentThread {
 
       const unsubscribe = session.subscribe((event) => this.onEvent(event));
       try {
-        await session.prompt(task);
+        await session.prompt(material ? `${task}\n\n${material}` : task);
       } finally {
         unsubscribe();
       }

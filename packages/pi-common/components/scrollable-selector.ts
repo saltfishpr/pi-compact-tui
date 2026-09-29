@@ -1,3 +1,4 @@
+import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
   DynamicBorder,
   keyHint,
@@ -8,6 +9,56 @@ import {
 import { Container, getKeybindings, Key, matchesKey, Spacer, Text, TruncatedText } from "@earendil-works/pi-tui";
 
 /** Configuration for a scrollable selector. */
+export interface SelectScrollableOptions {
+  signal?: AbortSignal;
+  maxMessageHeight?: number;
+  maxVisibleOptions?: number;
+}
+
+/** Select an option with scrollable details in the TUI, falling back to Pi's selector in RPC mode. */
+export async function selectScrollable(
+  ctx: ExtensionContext,
+  title: string,
+  message: string,
+  options: readonly string[],
+  opts?: SelectScrollableOptions,
+): Promise<string | undefined> {
+  if (!ctx.hasUI || opts?.signal?.aborted) return undefined;
+
+  const { signal, maxMessageHeight, maxVisibleOptions } = opts ?? {};
+  if (ctx.mode !== "tui") {
+    return ctx.ui.select(`${title}\n\n${message}`, [...options], { signal });
+  }
+
+  let cleanup: (() => void) | undefined;
+  try {
+    return await ctx.ui.custom<string | undefined>((tui, theme, keybindings, done) => {
+      const onAbort = () => done(undefined);
+      signal?.addEventListener("abort", onAbort, { once: true });
+      cleanup = () => signal?.removeEventListener("abort", onAbort);
+
+      const selector = new ScrollableSelectorComponent(title, message, options, done, () => done(undefined), {
+        maxMessageHeight: maxMessageHeight ?? Math.max(10, Math.floor(tui.terminal.rows / 2)),
+        maxVisibleOptions: maxVisibleOptions ?? Math.min(options.length, 5),
+        theme,
+        keybindings,
+      });
+      if (signal?.aborted) onAbort();
+
+      return {
+        render: (width: number) => selector.render(width),
+        invalidate: () => selector.invalidate(),
+        handleInput: (data: string) => {
+          selector.handleInput(data);
+          tui.requestRender();
+        },
+      };
+    });
+  } finally {
+    cleanup?.();
+  }
+}
+
 export type ScrollableSelectorOptions = {
   /** Maximum number of wrapped message rows to display. */
   maxMessageHeight: number;

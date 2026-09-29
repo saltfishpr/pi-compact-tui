@@ -1,20 +1,25 @@
 import { Type, type TextContent } from "@earendil-works/pi-ai";
 import {
+  DynamicBorder,
   getMarkdownTheme,
+  getSettingsListTheme,
   keyHint,
   type AgentToolResult,
   type ExtensionAPI,
   type ExtensionContext,
   type ModelRuntime,
 } from "@earendil-works/pi-coding-agent";
-import { Box, Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
+import { Box, Container, Markdown, SettingsList, Spacer, Text, type SettingItem } from "@earendil-works/pi-tui";
 
 import { resolveModel, type UsageTotals } from "../pi-common";
 import { discoverAgents, type AgentDiagnostic, type AgentProfile } from "./agents";
 import { inChildSessionContext } from "./child-context";
 import { loadConfig, type SubagentConfig } from "./config";
 import { formatDuration, formatUsage } from "./format";
+import { logger } from "./logger";
 import { SubagentManager, type SpawnStopReason } from "./manager";
+import { runProfileCommands } from "./profile-commands";
+import { ProfileTrust } from "./profile-trust";
 import { createSubagentWidget } from "./widget";
 
 const WIDGET_KEY = "pi-subagent";
@@ -34,7 +39,7 @@ function reportDiagnostics(ctx: ExtensionContext, diagnostics: AgentDiagnostic[]
   if (ctx.hasUI) {
     ctx.ui.notify(message, "warning");
   } else {
-    process.stderr.write(`[pi-subagent] ${message}\n`);
+    logger.warn(message);
   }
 }
 
@@ -80,6 +85,7 @@ export default function (pi: ExtensionAPI) {
   let config = loadConfig();
   let agents: AgentProfile[] = [];
   let manager: SubagentManager | undefined;
+  const profileTrust = new ProfileTrust();
 
   pi.registerTool({
     name: "agent",
@@ -91,7 +97,7 @@ export default function (pi: ExtensionAPI) {
     promptSnippet: "Delegate a focused task to a specialized subagent that runs in an isolated context",
     promptGuidelines: [
       "Use agent to delegate self-contained tasks to a specialized subagent; the subagent does not see the current conversation, so put every needed detail into `task`.",
-      "Use agent when a task matches one of the listed subagents and benefits from an isolated context (e.g. broad research, parallelizable subtasks) — avoid it for trivial lookups you can handle directly.",
+      "Choose a subagent only when its description matches the task. If none matches, handle the task yourself; do not substitute another role.",
     ],
     parameters: Type.Object({
       name: Type.String({
@@ -136,6 +142,11 @@ export default function (pi: ExtensionAPI) {
           task: params.task,
           model: resolved.model,
           thinkingLevel: resolved.thinkingLevel,
+          prepare: async (prepareSignal) => {
+            await profileTrust.authorize(profile, ctx, prepareSignal);
+            if (profile.commands.length === 0) return "";
+            return runProfileCommands(profile.commands, ctx.cwd, prepareSignal);
+          },
         },
         signal,
       );
@@ -206,6 +217,109 @@ export default function (pi: ExtensionAPI) {
 
       box.addChild(content);
       return box;
+    },
+  });
+
+  pi.registerCommand("subagent-trust", {
+    description: "Select trusted subagent profiles",
+    handler: async (_args, ctx) => {
+      if (ctx.mode !== "tui") {
+        return;
+      }
+
+      const catalog = discoverAgents(ctx.cwd, ctx.isProjectTrusted());
+      reportDiagnostics(ctx, catalog.diagnostics);
+      if (catalog.diagnostics.length > 0) {
+        ctx.ui.notify("Resolve invalid subagent profiles before changing trust", "error");
+        return;
+      }
+      const profiles = [...new Map(catalog.agents.map((profile) => [profile.path, profile])).values()];
+      if (profiles.length === 0) {
+        ctx.ui.notify("No subagent profiles available", "info");
+        return;
+      }
+
+      const trusted = profileTrust.list();
+      const selectedPaths = new Set(
+        profiles
+          .filter((profile) => trusted.some((entry) => entry.path === profile.path && entry.sha256 === profile.sha256))
+          .map((profile) => profile.path),
+      );
+      const selection = await ctx.ui.custom<Set<string> | undefined>((tui, theme, keybindings, done) => {
+        const items: SettingItem[] = profiles.map((profile) => ({
+          id: profile.path,
+          label: `${JSON.stringify(profile.name)} [${profile.source}]`,
+          currentValue: selectedPaths.has(profile.path) ? "trusted" : "untrusted",
+          values: ["trusted", "untrusted"],
+          description: `${JSON.stringify(profile.path)} · ${profile.commands.length} pre-run commands`,
+        }));
+        const settings = new SettingsList(
+          items,
+          Math.min(items.length, 8),
+          getSettingsListTheme(),
+          (path, value) => {
+            if (value === "trusted") selectedPaths.add(path);
+            else selectedPaths.delete(path);
+          },
+          () => done(undefined),
+          { enableSearch: true },
+        );
+        const container = new Container();
+        container.addChild(new DynamicBorder((text: string) => theme.fg("accent", text)));
+        container.addChild(new Text(theme.fg("accent", theme.bold("Subagent Profile Trust")), 1, 0));
+        container.addChild(
+          new Text(
+            theme.fg(
+              "muted",
+              "Selected profiles may run ! commands in any working directory. Review files before saving.",
+            ),
+            1,
+            0,
+          ),
+        );
+        container.addChild(settings);
+        const hints = [
+          keyHint("tui.select.confirm", "toggle"),
+          keyHint("app.models.enableAll", "all"),
+          keyHint("app.models.clearAll", "none"),
+          keyHint("app.models.save", "save"),
+          keyHint("tui.select.cancel", "cancel"),
+        ].join(" · ");
+        container.addChild(new Text(theme.fg("dim", hints), 1, 0));
+        container.addChild(new DynamicBorder((text: string) => theme.fg("accent", text)));
+
+        return {
+          render: (width: number) => container.render(width),
+          invalidate: () => container.invalidate(),
+          handleInput: (data: string) => {
+            if (keybindings.matches(data, "app.models.save")) {
+              done(new Set(selectedPaths));
+            } else if (
+              keybindings.matches(data, "app.models.enableAll") ||
+              keybindings.matches(data, "app.models.clearAll")
+            ) {
+              const enable = keybindings.matches(data, "app.models.enableAll");
+              for (const profile of profiles) {
+                if (enable) selectedPaths.add(profile.path);
+                else selectedPaths.delete(profile.path);
+                settings.updateValue(profile.path, enable ? "trusted" : "untrusted");
+              }
+            } else {
+              settings.handleInput(data);
+            }
+            tui.requestRender();
+          },
+        };
+      });
+      if (!selection) return;
+
+      try {
+        await profileTrust.saveSelection(profiles, selection);
+        ctx.ui.notify(`Saved trust for ${selection.size} of ${profiles.length} subagent profiles`, "info");
+      } catch (error) {
+        logger.error("Failed to save subagent profile trust", { error });
+        ctx.ui.notify(`Failed to save subagent profile trust: ${String(error)}`, "error");
+      }
     },
   });
 

@@ -114,7 +114,7 @@ When a session is idle, automatically generates a short recap above the input bo
 
 ### Subagent (`pi-subagent`)
 
-Provides Pi with an `agent` tool for delegating independent subtasks, such as codebase exploration and planning, to subagents running in isolated contexts. Two subagents are included: `explore` and `planner`; you can add your own as well.
+Provides Pi with an `agent` tool for delegating independent subtasks to subagents running in isolated contexts. Three subagents are included: `explore`, `planner`, and `reviewer`; you can add your own as well.
 
 ![Subagent](./assets/subagent.png)
 
@@ -128,11 +128,14 @@ effort: low
 maxTurns: 30
 ---
 
+!git status --short
+
 Write the subagent system prompt here...
 ```
 
 - `description` (required): Tells the main model when to use this subagent.
 - `model` / `effort` / `maxTurns`: Optional. They inherit the current session model when omitted; `maxTurns` defaults to 50.
+- `!command`: Optional shell command at the start of a line (outside code blocks). It runs in the current project directory before the subagent starts; its output is supplied to the subagent.
 
 **Configuration**: Edit `~/.pi/agent/extensions/subagent.json` to disable the feature, limit concurrency, or override `model` / `effort` / `maxTurns` by subagent name:
 
@@ -145,6 +148,8 @@ Write the subagent system prompt here...
   }
 }
 ```
+
+**Command approval**: Before a profile's `!` commands run, choose Deny, Allow once, or Trust this version. In the TUI, `/subagent-trust` lists available profiles: search by name, toggle trust with Enter/Space, select all with Ctrl+A, clear with Ctrl+X, then press Ctrl+S to save all changes at once or Esc to discard them. The command maintains `trustedProfiles` in `subagent.json`; trust is tied to the file path and content hash across all working directories, so edits require fresh approval. Profiles from other projects that are not listed are left unchanged. This approval covers only `!` commands, not the subagent's tools.
 
 ### Usage Tips (`pi-tips`)
 

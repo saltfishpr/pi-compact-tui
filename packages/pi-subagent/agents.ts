@@ -1,7 +1,7 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { basename, join } from "node:path";
-
 import { CONFIG_DIR_NAME, getAgentDir, parseFrontmatter } from "@earendil-works/pi-coding-agent";
+import { createHash } from "node:crypto";
+import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
+import { basename, join, sep } from "node:path";
 import * as z from "zod";
 
 import { modelSchema, THINKING_LEVELS } from "../pi-common";
@@ -27,6 +27,9 @@ export interface AgentProfile extends AgentFrontmatter {
   name: string;
   source: AgentSource;
   body: string;
+  path: string;
+  sha256: string;
+  commands: string[];
 }
 
 export interface AgentDiagnostic {
@@ -52,6 +55,34 @@ function formatValidationError(error: z.ZodError): string {
     .join("; ");
 }
 
+export function profileHash(content: string): string {
+  return createHash("sha256").update(content).digest("hex");
+}
+
+function extractCommands(body: string): { body: string; commands: string[] } {
+  const commands: string[] = [];
+  let fence: { marker: string; length: number } | undefined;
+  const lines = body.split("\n").filter((line) => {
+    const marker = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+    if (fence) {
+      if (marker && marker[1]![0] === fence.marker && marker[1]!.length >= fence.length && !marker[2]!.trim()) {
+        fence = undefined;
+      }
+      return true;
+    }
+    if (marker) {
+      fence = { marker: marker[1]![0]!, length: marker[1]!.length };
+      return true;
+    }
+    if (!line.startsWith("!")) return true;
+    const command = line.slice(1).trim();
+    if (!command) throw new Error("Empty ! command in agent profile");
+    commands.push(command);
+    return false;
+  });
+  return { body: lines.join("\n"), commands };
+}
+
 function loadAgentsFromDir(
   dir: string,
   source: AgentSource,
@@ -73,7 +104,8 @@ function loadAgentsFromDir(
   for (const file of files) {
     const path = join(dir, file);
     try {
-      const { frontmatter, body } = parseFrontmatter(readFileSync(path, "utf8"));
+      const content = readFileSync(path, "utf8");
+      const { frontmatter, body } = parseFrontmatter(content);
       const parsed = frontmatterSchema.safeParse(frontmatter);
       if (!parsed.success) {
         diagnostics.push({ path, message: formatValidationError(parsed.error) });
@@ -81,7 +113,18 @@ function loadAgentsFromDir(
       }
 
       const name = basename(file, ".md");
-      agents.set(name, { name, source, body, ...parsed.data });
+      const actualPath = realpathSync(path);
+      if (source === "builtin" && !actualPath.startsWith(`${realpathSync(BUILTIN_AGENTS_DIR)}${sep}`)) {
+        throw new Error("Bundled agent profile points outside the package");
+      }
+      agents.set(name, {
+        name,
+        source,
+        path: actualPath,
+        sha256: profileHash(content),
+        ...extractCommands(body),
+        ...parsed.data,
+      });
     } catch (error) {
       diagnostics.push({ path, message: errorMessage(error) });
     }

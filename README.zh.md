@@ -114,7 +114,7 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 
 ### Subagent（`pi-subagent`）
 
-为 Pi 提供 `agent` 工具，可把独立子任务（如探索代码库、制定计划）委托给子代理，在隔离上下文中运行。内置 `explore`（探索）和 `planner`（规划）两个子代理，你也可以添加自己的。
+为 Pi 提供 `agent` 工具，可把独立子任务委托给在隔离上下文中运行的子代理。内置 `explore`（探索）、`planner`（规划）和 `reviewer`（代码审查），你也可以添加自己的。
 
 ![子代理](./assets/subagent.png)
 
@@ -128,11 +128,14 @@ effort: low
 maxTurns: 30
 ---
 
+!git status --short
+
 这里写子代理的系统提示词……
 ```
 
 - `description`（必填）：告诉主模型何时使用该子代理。
 - `model` / `effort` / `maxTurns`：可选，不填时继承当前会话模型；`maxTurns` 默认 50。
+- `!command`：可选，写在代码块外、行首的 shell 命令。子代理启动前在当前项目目录执行，输出会提供给子代理。
 
 **配置**：编辑 `~/.pi/agent/extensions/subagent.json`，可关闭功能、限制并发数，或按子代理名覆盖其 `model` / `effort` / `maxTurns`：
 
@@ -145,6 +148,8 @@ maxTurns: 30
   }
 }
 ```
+
+**命令授权**：执行配置中的 `!` 命令前，可选择拒绝、仅本次允许或信任此版本。在 TUI 中运行 `/subagent-trust` 可搜索可用配置，用 Enter/Space 切换信任、Ctrl+A 全选、Ctrl+X 清空，最后用 Ctrl+S 一次保存全部修改，或用 Esc 放弃修改。命令自动维护 `subagent.json` 中的 `trustedProfiles`；信任绑定文件路径和内容哈希，适用于所有工作目录，文件变化后需要重新授权。当前列表未显示的其他项目配置不受影响。此授权仅针对 `!` 命令，不限制子代理后续使用工具。
 
 ### 使用提示（`pi-tips`）
 

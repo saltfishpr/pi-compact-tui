@@ -1,4 +1,9 @@
-export { ScrollableSelectorComponent, type ScrollableSelectorOptions } from "./components/scrollable-selector";
+export {
+  ScrollableSelectorComponent,
+  selectScrollable,
+  type ScrollableSelectorOptions,
+  type SelectScrollableOptions,
+} from "./components/scrollable-selector";
 export { ConfigError, getGlobalConfigPath, loadJSONConfig } from "./config";
 export { createLogger } from "./logger";
 export type { CreateLoggerOptions, Logger } from "./logger";
