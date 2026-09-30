@@ -99,6 +99,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "agent",
     label: "Agent",
+    exposure: "model-only",
     description: [
       "Delegate a focused task to a specialized subagent that runs in an isolated context.",
       "The subagent does not see this conversation, so include every piece of context it needs in `task`.",
