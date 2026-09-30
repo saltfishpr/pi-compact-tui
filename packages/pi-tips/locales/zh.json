@@ -11,7 +11,7 @@
   "tip.history": "按 Shift+↑ / Shift+↓ 可跨会话浏览输入历史。",
   "tip.recap": "运行 /recap 可生成当前会话的简要摘要。",
   "tip.trustGit": "配置 ~/.pi/agent/extensions/trust.json 可按 Git origin 自动信任项目。",
-  "tip.footer": "编辑 ~/.pi/agent/extensions/footer.json 可自定义底部状态栏布局。",
+  "tip.footer": "编辑 ~/.pi/agent/extensions/compact-layout.json 可排列 footer 和输入框边框元素，运行 /reload 生效。",
   "tip.subagent": "让 Pi \"使用 planner subagent\" 可基于当前代码库产出一份实现计划。",
   "tip.bashAudit": "运行 /audit 选择模型并启用 LLM 驱动的 bash 命令安全审计。",
   "tip.copyMessage": "按 Ctrl+X 可复制最后一条助手消息，或在 /tree 中复制选中的消息。",

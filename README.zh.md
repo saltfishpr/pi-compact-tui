@@ -57,38 +57,72 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 
 提供 `/clear` 命令，开启全新会话并继承当前模型和推理档位。
 
-### 精简编辑器（`pi-compact-editor`）
+### 精简布局（`pi-compact-layout`）
 
-替换默认输入框，在输入框边框上展示状态：左侧显示工作状态（Thinking / Streaming / Running xxx），右侧显示当前模型与推理档位。
+自定义输入框边框和底部状态栏（footer），把模型、用量、Git 分支等信息放在你需要的位置。支持多行 footer，以及输入框的右上、左下、右下三个位置；Pi 的活动状态嵌入左上边框，保留原生滚动提示、快捷键和边框颜色。
 
-### 可配置状态栏（`pi-compact-footer`）
-
-替换默认底部状态栏，支持多行、左右对齐，可自由排列要展示的元素：目录、Git 分支、会话名、token 用量（输入/输出/缓存读/缓存写）、缓存命中率、费用、上下文占用、模型、推理档位，以及其他扩展注册的状态。
-
-**配置**：编辑 `~/.pi/agent/extensions/footer.json`：
+**配置**：编辑 `~/.pi/agent/extensions/compact-layout.json`，运行 `/reload` 生效。默认配置如下：
 
 ```json
 {
   "separator": " ",
-  "lines": [
+  "footer": [
     {
       "left": [
         "pwd",
-        { "kind": "literal", "value": "|", "color": "dim" },
-        "branch",
+        { "kind": "element", "value": "branch", "prefix": "(", "suffix": ")" },
         "sessionName"
       ],
-      "right": ["cacheHitRate", "cost", "context"]
+      "right": [
+        "status:codex-stats",
+        "status:deepseek-stats",
+        "status:zai-stats",
+        "cacheHitRate",
+        "cost",
+        "context"
+      ]
     },
-    { "left": ["extensionStatuses"] }
-  ]
+    { "left": ["extensionStatuses"], "right": [] }
+  ],
+  "editor": {
+    "topRight": [
+      { "kind": "element", "value": "provider", "prefix": "(", "suffix": ")" },
+      "model",
+      { "kind": "element", "value": "thinkingLevel", "prefix": "• ", "suffix": "" }
+    ],
+    "bottomLeft": [],
+    "bottomRight": []
+  }
 }
 ```
 
-- `separator`：连接同侧非空元素的默认文本。
-- `lines`：每行一个对象，`left` 与 `right` 是元素数组，分别靠左、靠右排列。
-- 可用元素名：`pwd`、`branch`、`sessionName`、`inputTokens`、`outputTokens`、`cacheReadTokens`、`cacheWriteTokens`、`cacheHitRate`、`cost`、`context`、`provider`、`model`、`thinkingLevel`、`extensionStatuses`，以及 `status:<key>`（引用其他扩展注册的状态，如 `status:codex-stats`）。
-- 可在元素数组中插入 `{ "kind": "literal", "value": "|", "color": "dim" }` 显示自定义文本；`color` 使用 Pi theme 的 foreground color 名称，无效时回退到 `dim`。literal 与相邻元素之间仍会插入 `separator`。
+**布局字段**：
+
+- `footer`：每个对象对应一行，`left` 和 `right` 数组分别靠左、靠右显示。设为 `[]` 隐藏 footer，没有内容的行自动隐藏。
+- `editor`：`topRight`、`bottomLeft`、`bottomRight` 分别对应输入框右上、左下、右下。设为 `{}` 清空这三个位置，但不影响 Pi 的活动状态和滚动提示。
+- `separator`：同一数组中非空元素之间的分隔文本，默认为一个空格。
+
+数组顺序就是显示顺序，元素不自带圆点分隔符或装饰括号。可以在任意位置使用下表中的元素；移动元素即可更换位置，删除元素即可隐藏，重复添加则重复显示。省略整个 `footer` 或 `editor` 字段时保留该部分默认布局；提供字段时替换整个布局，不与默认值合并，未填写的 `left`、`right` 或边框位置为空。空间不足时，内容会截断或隐藏；Pi 的活动状态和滚动提示优先显示。
+
+**可用元素**：
+
+| 元素                                  | 显示内容                                                                            |
+| ------------------------------------- | ----------------------------------------------------------------------------------- |
+| `pwd`、`branch`、`sessionName`        | 当前会话目录、Git 分支、会话名                                                      |
+| `provider`、`model`、`thinkingLevel`  | 当前 provider、模型、推理档位（如 `high` 或 `off`）；推理档位仅对支持推理的模型显示 |
+| `inputTokens`、`outputTokens`         | 会话累计输入、输出 token 数                                                         |
+| `cacheReadTokens`、`cacheWriteTokens` | 会话累计缓存读取、写入 token 数                                                     |
+| `cacheHitRate`                        | 最近一次模型响应的输入缓存命中率                                                    |
+| `cost`                                | 会话累计费用，订阅模型带有 `(sub)` 标记                                             |
+| `context`                             | 上下文占用比例和窗口大小，启用自动压缩时带有 `(auto)` 标记                          |
+| `extensionStatuses`                   | 未单独指定位置的其他扩展状态                                                        |
+| `status:<key>`                        | 指定扩展状态，例如 `status:codex-stats`；需要提供该状态的扩展已启用                 |
+
+例如，将 `status:codex-stats` 从 footer 移到 `editor.bottomRight`，即可在输入框右下显示 Codex 用量。单独指定位置的状态不会再出现在 `extensionStatuses` 中，扩展提供的颜色保持不变。订阅用量和账户余额由本包的 `pi-usage-stats` 提供，没有对应状态时不显示。
+
+需要装饰元素时，使用 `{ "kind": "element", "value": "branch", "prefix": "(", "suffix": ")" }`。`value` 可以使用上表中的任意元素，包括 `status:<key>`。`prefix`、`suffix` 均可省略，默认为空字符串，仅在元素有内容时显示。默认布局通过这种配置显示 `(branch)`、`(provider)` 和 `model • thinkingLevel`；直接使用字符串元素时不带装饰。
+
+数组中也可以加入 `{ "kind": "literal", "value": "|", "color": "dim" }` 显示自定义单行文本。`color` 使用 Pi 主题的前景色名称，例如 `dim`、`accent`、`warning`；无效名称按 `dim` 显示。
 
 ### 输入历史（`pi-history`）
 

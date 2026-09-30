@@ -57,38 +57,72 @@ Field descriptions:
 
 Provides the `/clear` command to start a fresh session while keeping the current model and thinking level.
 
-### Compact Editor (`pi-compact-editor`)
+### Compact Layout (`pi-compact-layout`)
 
-Replaces the default input box and displays status in its border: activity status on the left (Thinking / Streaming / Running xxx), and the current model and reasoning level on the right.
+Customize the editor borders and footer to put model, usage, and Git information where you want it. Supports a multi-line footer and three editor positions: top-right, bottom-left, and bottom-right. Pi's activity indicator is embedded in the top-left border, while native scrolling hints, shortcuts, and border colors are preserved.
 
-### Configurable Footer (`pi-compact-footer`)
-
-Replaces the default footer with a configurable, multi-line status bar. It supports left and right alignment and lets you arrange the displayed items freely: directory, Git branch, session name, token usage (input/output/cache read/cache write), cache hit rate, cost, context usage, model, reasoning level, and statuses registered by other extensions.
-
-**Configuration**: Edit `~/.pi/agent/extensions/footer.json`:
+**Configuration**: Edit `~/.pi/agent/extensions/compact-layout.json`, then run `/reload`. The default configuration is:
 
 ```json
 {
   "separator": " ",
-  "lines": [
+  "footer": [
     {
       "left": [
         "pwd",
-        { "kind": "literal", "value": "|", "color": "dim" },
-        "branch",
+        { "kind": "element", "value": "branch", "prefix": "(", "suffix": ")" },
         "sessionName"
       ],
-      "right": ["cacheHitRate", "cost", "context"]
+      "right": [
+        "status:codex-stats",
+        "status:deepseek-stats",
+        "status:zai-stats",
+        "cacheHitRate",
+        "cost",
+        "context"
+      ]
     },
-    { "left": ["extensionStatuses"] }
-  ]
+    { "left": ["extensionStatuses"], "right": [] }
+  ],
+  "editor": {
+    "topRight": [
+      { "kind": "element", "value": "provider", "prefix": "(", "suffix": ")" },
+      "model",
+      { "kind": "element", "value": "thinkingLevel", "prefix": "• ", "suffix": "" }
+    ],
+    "bottomLeft": [],
+    "bottomRight": []
+  }
 }
 ```
 
-- `separator`: The default text inserted between non-empty items on the same side.
-- `lines`: One object per line. `left` and `right` are arrays of items aligned to their respective sides.
-- Available item names: `pwd`, `branch`, `sessionName`, `inputTokens`, `outputTokens`, `cacheReadTokens`, `cacheWriteTokens`, `cacheHitRate`, `cost`, `context`, `provider`, `model`, `thinkingLevel`, `extensionStatuses`, and `status:<key>` (references a status registered by another extension, such as `status:codex-stats`).
-- Insert `{ "kind": "literal", "value": "|", "color": "dim" }` in an item array to display custom text. `color` accepts a Pi theme foreground color name and falls back to `dim` when invalid. The configured `separator` is still inserted between the literal and adjacent items.
+**Layout fields**:
+
+- `footer`: One object per line, with `left` and `right` arrays aligned to each side. Set to `[]` to hide the footer; lines without content are hidden automatically.
+- `editor`: `topRight`, `bottomLeft`, and `bottomRight` place items in the corresponding editor corners. Set to `{}` to clear all three positions without affecting Pi's activity indicator or scrolling hints.
+- `separator`: Text between non-empty items in the same array. Defaults to one space.
+
+Items appear in array order, without built-in separators such as bullets or decorative parentheses. Use any item below in any position; move it to change its position, remove it to hide it, or repeat it to display it more than once. Omitting the entire `footer` or `editor` field keeps that section's default layout. Providing a field replaces its entire layout rather than merging with defaults; unspecified line sides or editor positions are empty. Content is truncated or hidden when space is limited, with Pi's activity indicator and scrolling hints taking priority.
+
+**Available items**:
+
+| Item                                  | Displays                                                                                                                          |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `pwd`, `branch`, `sessionName`        | Current session directory, Git branch, and session name                                                                           |
+| `provider`, `model`, `thinkingLevel`  | Current provider, model, and reasoning level (such as `high` or `off`); reasoning level appears only for reasoning-capable models |
+| `inputTokens`, `outputTokens`         | Session-wide input and output token totals                                                                                        |
+| `cacheReadTokens`, `cacheWriteTokens` | Session-wide cache read and write token totals                                                                                    |
+| `cacheHitRate`                        | Input cache hit rate of the latest model response                                                                                 |
+| `cost`                                | Session-wide cost, with `(sub)` for subscription models                                                                           |
+| `context`                             | Context usage percentage and window size, with `(auto)` when automatic compaction is enabled                                      |
+| `extensionStatuses`                   | Other extension statuses without an explicitly assigned position                                                                  |
+| `status:<key>`                        | A specific extension status, such as `status:codex-stats`; requires the extension providing that status to be enabled             |
+
+For example, move `status:codex-stats` from the footer to `editor.bottomRight` to show Codex usage in the editor's bottom-right border. Explicitly positioned statuses are excluded from `extensionStatuses`, and extension-provided colors are preserved. Subscription usage and account balances are supplied by this package's `pi-usage-stats` extension and are hidden when no matching status is available.
+
+To decorate an item, use `{ "kind": "element", "value": "branch", "prefix": "(", "suffix": ")" }`. `value` accepts any item above, including `status:<key>`. Optional `prefix` and `suffix` default to empty strings and appear only when the item has content. The default layout uses this to show `(branch)`, `(provider)`, and `model • thinkingLevel`; plain string items remain undecorated.
+
+Arrays can also contain `{ "kind": "literal", "value": "|", "color": "dim" }` for custom single-line text. `color` accepts a Pi theme foreground color name, such as `dim`, `accent`, or `warning`; invalid names fall back to `dim`.
 
 ### Input History (`pi-history`)
 

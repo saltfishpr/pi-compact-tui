@@ -11,7 +11,7 @@
   "tip.history": "Press Shift+Up / Shift+Down to browse your input history across sessions.",
   "tip.recap": "Run /recap to generate a short summary of the current session.",
   "tip.trustGit": "Configure ~/.pi/agent/extensions/trust.json to auto-trust projects by Git origin.",
-  "tip.footer": "Customize the footer layout by editing ~/.pi/agent/extensions/footer.json.",
+  "tip.footer": "Arrange footer and editor border items in ~/.pi/agent/extensions/compact-layout.json; run /reload to apply changes.",
   "tip.subagent": "Ask Pi to \"use the planner subagent\" to draft a plan grounded in the codebase.",
   "tip.bashAudit": "Run /audit to choose a model and enable LLM-powered bash command auditing.",
   "tip.copyMessage": "Press Ctrl+X to copy the last assistant message, or the selected message inside /tree.",

@@ -12,8 +12,7 @@ This file provides guidance to AI agents when working with code in this reposito
 pi-compact-tui/
 ├── packages/
 │   ├── pi-clear-command/index.ts    # /clear 命令，等价于 /new 开启新会话
-│   ├── pi-compact-editor/index.ts   # 自定义编辑器（CustomEditor 子类），在输入框边框展示活动/模型/推理档位
-│   ├── pi-compact-footer/           # 多行底部状态栏（index.ts + config.ts 布局配置）
+│   ├── pi-compact-layout/           # 可配置的 footer 和 editor 边框元素
 │   ├── pi-history/index.ts          # 输入历史，shift+↑/↓ 检索，跨会话持久化
 │   ├── pi-provider-ark/index.ts     # 注册 ark-coding-plan provider（火山方舟 Coding Plan）
 │   ├── pi-usage-stats/              # 各 provider 的订阅限流与账户余额状态

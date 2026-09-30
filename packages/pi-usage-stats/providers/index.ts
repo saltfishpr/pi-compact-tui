@@ -11,7 +11,6 @@ export interface ProviderStatsAdapter {
   label: string;
   /** Provider id, matched against ctx.model.provider. */
   provider: string;
-  /** Status bar key, kept stable so footer.json status:<key> entries keep working. */
   statusKey: string;
   /** Determines whether the adapter reports a balance or subscription quota. */
   kind: ProviderStatsKind;

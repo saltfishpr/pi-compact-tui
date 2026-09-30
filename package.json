@@ -28,8 +28,7 @@
     "extensions": [
       "./packages/pi-bash-audit/index.ts",
       "./packages/pi-clear-command/index.ts",
-      "./packages/pi-compact-editor/index.ts",
-      "./packages/pi-compact-footer/index.ts",
+      "./packages/pi-compact-layout/index.ts",
       "./packages/pi-history/index.ts",
       "./packages/pi-provider-ark/index.ts",
       "./packages/pi-recap/index.ts",
@@ -43,7 +42,6 @@
   },
   "scripts": {
     "test": "vitest run",
-    "bench:footer": "vitest bench --run packages/pi-compact-footer/footer.bench.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
