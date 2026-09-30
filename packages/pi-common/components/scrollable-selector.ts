@@ -45,14 +45,7 @@ export async function selectScrollable(
       });
       if (signal?.aborted) onAbort();
 
-      return {
-        render: (width: number) => selector.render(width),
-        invalidate: () => selector.invalidate(),
-        handleInput: (data: string) => {
-          selector.handleInput(data);
-          tui.requestRender();
-        },
-      };
+      return selector;
     });
   } finally {
     cleanup?.();

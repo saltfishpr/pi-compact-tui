@@ -8,8 +8,8 @@ export function selectAuditModel(
   models: readonly Model<Api>[],
   currentModel: Model<Api> | undefined,
 ): Promise<Model<Api> | undefined> {
-  return ctx.ui.custom<Model<Api> | undefined>((tui, theme, keybindings, done) => {
-    const selector = new FilterableSelectorComponent<Model<Api>>({
+  return ctx.ui.custom<Model<Api> | undefined>((_tui, theme, keybindings, done) => {
+    return new FilterableSelectorComponent<Model<Api>>({
       title: "Configure Bash Audit",
       searchHint: "Search models by provider, id, or name",
       items: models,
@@ -21,14 +21,6 @@ export function selectAuditModel(
       theme,
       keybindings,
     });
-    return {
-      render: (width: number) => selector.render(width),
-      invalidate: () => selector.invalidate(),
-      handleInput: (data: string) => {
-        selector.handleInput(data);
-        tui.requestRender();
-      },
-    };
   });
 }
 
@@ -38,15 +30,7 @@ export function selectAuditThinkingLevel(
   currentLevel: ModelThinkingLevel,
   availableLevels: ModelThinkingLevel[],
 ): Promise<ModelThinkingLevel | undefined> {
-  return ctx.ui.custom<ModelThinkingLevel | undefined>((tui, _theme, _keybindings, done) => {
-    const selector = new ThinkingSelectorComponent(currentLevel, availableLevels, done, () => done(undefined));
-    return {
-      render: (width: number) => selector.render(width),
-      invalidate: () => selector.invalidate(),
-      handleInput: (data: string) => {
-        selector.getSelectList().handleInput(data);
-        tui.requestRender();
-      },
-    };
+  return ctx.ui.custom<ModelThinkingLevel | undefined>((_tui, _theme, _keybindings, done) => {
+    return new ThinkingSelectorComponent(currentLevel, availableLevels, done, () => done(undefined));
   });
 }

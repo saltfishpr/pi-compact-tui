@@ -1,8 +1,8 @@
 import { getAgentDir, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { FilterableSelectorComponent } from "../pi-common/components/filterable-selector";
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import writeFileAtomic from "write-file-atomic";
+import { FilterableSelectorComponent } from "../pi-common/components/filterable-selector";
 
 const MAX_HISTORY = 100;
 
@@ -121,8 +121,8 @@ export default function (pi: ExtensionAPI) {
     handler: async (_args, ctx) => {
       if (ctx.mode !== "tui") return;
       const items = view();
-      const selected = await ctx.ui.custom<string | undefined>((tui, theme, keybindings, done) => {
-        const selector = new FilterableSelectorComponent({
+      const selected = await ctx.ui.custom<string | undefined>((_tui, theme, keybindings, done) => {
+        return new FilterableSelectorComponent({
           title: "输入历史",
           searchHint: "模糊搜索历史输入",
           items,
@@ -134,14 +134,6 @@ export default function (pi: ExtensionAPI) {
           theme,
           keybindings,
         });
-        return {
-          render: (width) => selector.render(width),
-          invalidate: () => selector.invalidate(),
-          handleInput: (data) => {
-            selector.handleInput(data);
-            tui.requestRender();
-          },
-        };
       });
       if (selected !== undefined) ctx.ui.setEditorText(selected);
     },

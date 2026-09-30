@@ -197,7 +197,7 @@ function confirmWithScrollableMessage(ctx: ExtensionContext, reason: string, mes
   if (ctx.mode !== "tui") return ctx.ui.confirm(title, content);
 
   return ctx.ui.custom<boolean>((tui, theme, keybindings, done) => {
-    const selector = new ScrollableSelectorComponent(
+    return new ScrollableSelectorComponent(
       title,
       content,
       ["Yes", "No"],
@@ -210,14 +210,5 @@ function confirmWithScrollableMessage(ctx: ExtensionContext, reason: string, mes
         keybindings,
       },
     );
-
-    return {
-      render: (width: number) => selector.render(width),
-      invalidate: () => selector.invalidate(),
-      handleInput: (data: string) => {
-        selector.handleInput(data);
-        tui.requestRender();
-      },
-    };
   });
 }

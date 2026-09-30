@@ -11,8 +11,8 @@ export default function (pi: ExtensionAPI) {
       const message = Array.from({ length: 40 }, (_, i) => `第 ${i + 1} 行测试消息`).join("\n");
       const options = Array.from({ length: 20 }, (_, i) => `选项 ${i + 1}`);
 
-      const selected = await ctx.ui.custom<string | undefined>((tui, theme, keybindings, done) => {
-        const selector = new ScrollableSelectorComponent(
+      const selected = await ctx.ui.custom<string | undefined>((_tui, theme, keybindings, done) => {
+        return new ScrollableSelectorComponent(
           "这是一个非常长的标题，用于验证标题是否会被截断而非撑高组件",
           message,
           options,
@@ -25,15 +25,6 @@ export default function (pi: ExtensionAPI) {
             keybindings,
           },
         );
-
-        return {
-          render: (width) => selector.render(width),
-          invalidate: () => selector.invalidate(),
-          handleInput: (data) => {
-            selector.handleInput(data);
-            tui.requestRender();
-          },
-        };
       });
 
       ctx.ui.notify(`选择结果：${selected ?? "取消"}`, "info");

@@ -9,7 +9,16 @@ import {
   type ExtensionContext,
   type ModelRuntime,
 } from "@earendil-works/pi-coding-agent";
-import { Box, Container, Markdown, SettingsList, Spacer, Text, type SettingItem } from "@earendil-works/pi-tui";
+import {
+  Box,
+  Container,
+  Markdown,
+  SettingsList,
+  Spacer,
+  Text,
+  type SettingItem,
+  type TuiMouseEvent,
+} from "@earendil-works/pi-tui";
 
 import { resolveModel, type UsageTotals } from "../pi-common";
 import { discoverAgents, type AgentDiagnostic, type AgentProfile } from "./agents";
@@ -245,7 +254,7 @@ export default function (pi: ExtensionAPI) {
           .filter((profile) => trusted.some((entry) => entry.path === profile.path && entry.sha256 === profile.sha256))
           .map((profile) => profile.path),
       );
-      const selection = await ctx.ui.custom<Set<string> | undefined>((tui, theme, keybindings, done) => {
+      const selection = await ctx.ui.custom<Set<string> | undefined>((_tui, theme, keybindings, done) => {
         const items: SettingItem[] = profiles.map((profile) => ({
           id: profile.path,
           label: `${JSON.stringify(profile.name)} [${profile.source}]`,
@@ -278,19 +287,28 @@ export default function (pi: ExtensionAPI) {
           ),
         );
         container.addChild(settings);
-        const hints = [
-          keyHint("tui.select.confirm", "toggle"),
-          keyHint("app.models.enableAll", "all"),
-          keyHint("app.models.clearAll", "none"),
-          keyHint("app.models.save", "save"),
-          keyHint("tui.select.cancel", "cancel"),
-        ].join(" · ");
+        const hints = (
+          [
+            ["app.models.enableAll", "trust all"],
+            ["app.models.clearAll", "clear all"],
+            ["app.models.save", "save"],
+          ] as const
+        )
+          .flatMap(([action, description]) => {
+            const keys = keybindings
+              .getKeys(action)
+              .join("/")
+              .replace(/(^|[+/])[a-z]/g, (part) => part.toUpperCase());
+            return keys ? [`${keys} to ${description}`] : [];
+          })
+          .join(" · ");
         container.addChild(new Text(theme.fg("dim", hints), 1, 0));
         container.addChild(new DynamicBorder((text: string) => theme.fg("accent", text)));
 
         return {
           render: (width: number) => container.render(width),
           invalidate: () => container.invalidate(),
+          handleMouse: (event: TuiMouseEvent) => container.handleMouse(event),
           handleInput: (data: string) => {
             if (keybindings.matches(data, "app.models.save")) {
               done(new Set(selectedPaths));
@@ -307,7 +325,6 @@ export default function (pi: ExtensionAPI) {
             } else {
               settings.handleInput(data);
             }
-            tui.requestRender();
           },
         };
       });

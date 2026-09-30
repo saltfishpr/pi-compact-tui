@@ -25,8 +25,8 @@ export default function (pi: ExtensionAPI) {
     async handler(_args, ctx) {
       if (ctx.mode !== "tui") return;
 
-      const selected = await ctx.ui.custom<TestItem | undefined>((tui, theme, keybindings, done) => {
-        const selector = new FilterableSelectorComponent<TestItem>({
+      const selected = await ctx.ui.custom<TestItem | undefined>((_tui, theme, keybindings, done) => {
+        return new FilterableSelectorComponent<TestItem>({
           title: "Test Filterable Selector",
           searchHint: 'Search by provider, id, or name (e.g. "anthropic opus")',
           items: ITEMS,
@@ -39,15 +39,6 @@ export default function (pi: ExtensionAPI) {
           keybindings,
           maxVisible: 5,
         });
-
-        return {
-          render: (width) => selector.render(width),
-          invalidate: () => selector.invalidate(),
-          handleInput: (data) => {
-            selector.handleInput(data);
-            tui.requestRender();
-          },
-        };
       });
 
       ctx.ui.notify(`选择结果：${selected ? `${selected.id} [${selected.provider}]` : "取消"}`, "info");
