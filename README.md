@@ -224,7 +224,7 @@ Displays provider usage for the current model in the status bar:
 }
 ```
 
-Providers and subscription reset times are enabled by default.
+Providers are enabled by default. Subscription reset times are shown by default only when the remaining quota in the corresponding window is below 20%.
 
 ### Web Search (`pi-web-search`)
 

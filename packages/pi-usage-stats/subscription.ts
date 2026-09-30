@@ -30,7 +30,12 @@ export function formatSubscriptionStatus(
       const remainingPercent = window.usedPercent === undefined ? "?" : (100 - window.usedPercent).toFixed(0);
       const quota = `${formatWindow(window.windowSeconds)} ${remainingPercent}% left`;
       const coloredQuota = colorQuota(theme, quota, window.usedPercent);
-      if (options.showResetTime === false || window.resetAtMs === undefined) return coloredQuota;
+      if (
+        options.showResetTime === false ||
+        window.resetAtMs === undefined ||
+        window.usedPercent === undefined ||
+        window.usedPercent <= 80
+      ) return coloredQuota;
       return `${coloredQuota} ${theme.fg("dim", `🔄${formatRelativeTime(window.resetAtMs, options.now)}`)}`;
     })
     .join(theme.fg("dim", " • "));
