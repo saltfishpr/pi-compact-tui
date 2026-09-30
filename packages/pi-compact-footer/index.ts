@@ -10,14 +10,22 @@ import { isAbsolute, relative, resolve, sep } from "node:path";
 import { addUsageToTotals, createUsageTotals, type UsageTotals } from "../pi-common";
 import { type FooterConfig, type FooterElement, getStatusKey, loadConfig } from "./config";
 
+/**
+ * Sanitize text for display in a single-line status.
+ * Removes newlines, tabs, carriage returns, and other control characters.
+ */
 function sanitizeStatusText(text: string): string {
+  // Replace newlines, tabs, carriage returns with space, then collapse multiple spaces
   return text
     .replace(/[\r\n\t]/g, " ")
     .replace(/ +/g, " ")
     .trim();
 }
 
-function formatTokens(count: number): string {
+/**
+ * Format token counts for compact footer display.
+ */
+export function formatTokens(count: number): string {
   if (count < 1000) return count.toString();
   if (count < 10000) return `${(count / 1000).toFixed(1)}k`;
   if (count < 1000000) return `${Math.round(count / 1000)}k`;
@@ -25,65 +33,52 @@ function formatTokens(count: number): string {
   return `${Math.round(count / 1000000)}M`;
 }
 
-function formatCwdForFooter(cwd: string, home: string | undefined): string {
+export function formatCwdForFooter(cwd: string, home: string | undefined): string {
   if (!home) return cwd;
+
   const resolvedCwd = resolve(cwd);
   const resolvedHome = resolve(home);
   const relativeToHome = relative(resolvedHome, resolvedCwd);
   const isInsideHome =
     relativeToHome === "" ||
     (relativeToHome !== ".." && !relativeToHome.startsWith(`..${sep}`) && !isAbsolute(relativeToHome));
-  if (!isInsideHome) return cwd;
-  if (relativeToHome === "") return "~";
 
-  const segments = relativeToHome.split(sep);
-  const directorySegments = segments
-    .slice(0, -1)
-    .map((segment) => (segment.startsWith(".") ? segment.slice(0, 2) : segment.slice(0, 1)));
-  return ["~", ...directorySegments, segments.at(-1)].join(sep);
+  if (!isInsideHome) return cwd;
+  return relativeToHome === "" ? "~" : `~${sep}${relativeToHome}`;
 }
 
-interface TokenStats extends UsageTotals {
+interface SessionStats {
+  sessionManager: ExtensionContext["sessionManager"];
+  sessionId: string;
+  leafId: string | null;
+  entryCount: number;
+  usageTotals: UsageTotals;
   latestCacheHitRate: number | undefined;
 }
 
-function collectTokenStats(ctx: ExtensionContext): TokenStats {
-  const usageTotals = createUsageTotals();
-  let latestCacheHitRate: number | undefined;
-  for (const entry of ctx.sessionManager.getEntries()) {
-    if (entry.type === "message" && entry.message.role === "assistant") {
-      addUsageToTotals(usageTotals, entry.message.usage);
-      const promptTokens = entry.message.usage.input + entry.message.usage.cacheRead + entry.message.usage.cacheWrite;
-      latestCacheHitRate = promptTokens > 0 ? (entry.message.usage.cacheRead / promptTokens) * 100 : undefined;
-    } else if (entry.type === "message" && entry.message.role === "toolResult" && entry.message.usage) {
-      addUsageToTotals(usageTotals, entry.message.usage);
-    } else if ((entry.type === "branch_summary" || entry.type === "compaction") && entry.usage) {
-      addUsageToTotals(usageTotals, entry.usage);
-    }
-  }
-  return { ...usageTotals, latestCacheHitRate };
-}
-
-class ConfigurableFooter implements Component {
+export class ConfigurableFooter implements Component {
   private ctx: ExtensionContext;
-  private footerData: ReadonlyFooterDataProvider;
   private theme: Theme;
+  private footerData: ReadonlyFooterDataProvider;
   private config: FooterConfig;
-  private autoCompactEnabled = true;
+  private sessionStats?: SessionStats;
+  private getAutoCompactEnabled: () => boolean;
   private getThinkingLevel: () => string;
   private positionedStatusKeys: Set<string>;
 
   constructor(opts: {
     ctx: ExtensionContext;
-    footerData: ReadonlyFooterDataProvider;
     theme: Theme;
+    footerData: ReadonlyFooterDataProvider;
     config: FooterConfig;
+    getAutoCompactEnabled: () => boolean;
     getThinkingLevel: () => string;
   }) {
     this.ctx = opts.ctx;
-    this.footerData = opts.footerData;
     this.theme = opts.theme;
+    this.footerData = opts.footerData;
     this.config = opts.config;
+    this.getAutoCompactEnabled = opts.getAutoCompactEnabled;
     this.getThinkingLevel = opts.getThinkingLevel;
     this.positionedStatusKeys = new Set(
       this.config.lines
@@ -96,18 +91,65 @@ class ConfigurableFooter implements Component {
     );
   }
 
-  setAutoCompactEnabled(enabled: boolean): void {
-    this.autoCompactEnabled = enabled;
-  }
-
   invalidate(): void {}
 
   dispose(): void {
     // Git watcher cleanup handled by provider
   }
 
+  // Usage is independent of the selected model; context limits are read separately on every render.
+  private getSessionStats(): SessionStats {
+    const sessionManager = this.ctx.sessionManager;
+    // ReadonlySessionManager does not expose getEntryCount(), so keep this snapshot for the scan.
+    const entries = sessionManager.getEntries();
+    const entryCount = entries.length;
+    const sessionId = sessionManager.getSessionId();
+    const leafId = sessionManager.getLeafId();
+    const cached = this.sessionStats;
+    if (
+      cached &&
+      cached.sessionManager === sessionManager &&
+      cached.sessionId === sessionId &&
+      cached.leafId === leafId &&
+      cached.entryCount === entryCount
+    ) {
+      return cached;
+    }
+
+    // Calculate cumulative usage from ALL session entries (not just post-compaction messages)
+    const usageTotals = createUsageTotals();
+    let latestCacheHitRate: number | undefined;
+
+    for (const entry of entries) {
+      if (entry.type === "usage") {
+        addUsageToTotals(usageTotals, entry.usage);
+      } else if (entry.type === "message" && entry.message.role === "assistant") {
+        addUsageToTotals(usageTotals, entry.message.usage);
+
+        const latestPromptTokens =
+          entry.message.usage.input + entry.message.usage.cacheRead + entry.message.usage.cacheWrite;
+        latestCacheHitRate =
+          latestPromptTokens > 0 ? (entry.message.usage.cacheRead / latestPromptTokens) * 100 : undefined;
+      } else if (entry.type === "message" && entry.message.role === "toolResult" && entry.message.usage) {
+        addUsageToTotals(usageTotals, entry.message.usage);
+      } else if ((entry.type === "branch_summary" || entry.type === "compaction") && entry.usage) {
+        addUsageToTotals(usageTotals, entry.usage);
+      }
+    }
+
+    this.sessionStats = {
+      sessionManager,
+      sessionId,
+      leafId,
+      entryCount,
+      usageTotals,
+      latestCacheHitRate,
+    };
+    return this.sessionStats;
+  }
+
   private buildAll(extensionStatuses: ReadonlyMap<string, string>): Record<string, string> {
-    const stats = collectTokenStats(this.ctx);
+    const { usageTotals, latestCacheHitRate } = this.getSessionStats();
     const state = this.ctx;
     const theme = this.theme;
 
@@ -121,7 +163,7 @@ class ConfigurableFooter implements Component {
     const contextWindow = contextUsage?.contextWindow ?? state.model?.contextWindow ?? 0;
     const contextPercentValue = contextUsage?.percent ?? 0;
     const contextPercentText = contextUsage?.percent != null ? contextPercentValue.toFixed(1) : "?";
-    const autoIndicator = this.autoCompactEnabled ? " (auto)" : "";
+    const autoIndicator = this.getAutoCompactEnabled() ? " (auto)" : "";
     const contextDisplay =
       contextPercentText === "?"
         ? `?/${formatTokens(contextWindow)}${autoIndicator}`
@@ -132,10 +174,14 @@ class ConfigurableFooter implements Component {
     else contextStr = theme.fg("dim", contextDisplay);
 
     const usingSubscription = state.model
-      ? state.model.provider === "kimi-coding" || state.modelRegistry.isUsingOAuth(state.model)
+      ? state.model.provider === "kimi-coding" ||
+        (state.modelRegistry.isUsingOAuth(state.model) &&
+          state.modelRegistry.getProvider(state.model.provider)?.auth.oauth?.isSubscription === true)
       : false;
     const costStr =
-      stats.cost || usingSubscription ? `$${stats.cost.toFixed(3)}${usingSubscription ? " (sub)" : ""}` : "";
+      usageTotals.cost || usingSubscription
+        ? `$${usageTotals.cost.toFixed(3)}${usingSubscription ? " (sub)" : ""}`
+        : "";
 
     const providerCount = this.footerData.getAvailableProviderCount();
     const providerStr = state.model && providerCount > 1 ? `(${state.model.provider})` : "";
@@ -159,13 +205,13 @@ class ConfigurableFooter implements Component {
       pwd: theme.fg("dim", pwd),
       branch: branch ? theme.fg("dim", `(${branch})`) : "",
       sessionName: sessionName ? theme.fg("dim", `• ${sessionName}`) : "",
-      inputTokens: stats.input ? theme.fg("dim", `↑${formatTokens(stats.input)}`) : "",
-      outputTokens: stats.output ? theme.fg("dim", `↓${formatTokens(stats.output)}`) : "",
-      cacheReadTokens: stats.cacheRead ? theme.fg("dim", `R${formatTokens(stats.cacheRead)}`) : "",
-      cacheWriteTokens: stats.cacheWrite ? theme.fg("dim", `W${formatTokens(stats.cacheWrite)}`) : "",
+      inputTokens: usageTotals.input ? theme.fg("dim", `↑${formatTokens(usageTotals.input)}`) : "",
+      outputTokens: usageTotals.output ? theme.fg("dim", `↓${formatTokens(usageTotals.output)}`) : "",
+      cacheReadTokens: usageTotals.cacheRead ? theme.fg("dim", `R${formatTokens(usageTotals.cacheRead)}`) : "",
+      cacheWriteTokens: usageTotals.cacheWrite ? theme.fg("dim", `W${formatTokens(usageTotals.cacheWrite)}`) : "",
       cacheHitRate:
-        (stats.cacheRead > 0 || stats.cacheWrite > 0) && stats.latestCacheHitRate !== undefined
-          ? theme.fg("dim", `CH${stats.latestCacheHitRate.toFixed(1)}%`)
+        (usageTotals.cacheRead > 0 || usageTotals.cacheWrite > 0) && latestCacheHitRate !== undefined
+          ? theme.fg("dim", `CH${latestCacheHitRate.toFixed(1)}%`)
           : "",
       cost: costStr ? theme.fg("dim", costStr) : "",
       context: contextStr,
@@ -241,9 +287,10 @@ export default function (pi: ExtensionAPI) {
     ctx.ui.setFooter((_tui: TUI, theme: Theme, footerData: ReadonlyFooterDataProvider) => {
       return new ConfigurableFooter({
         ctx,
-        footerData,
         theme,
+        footerData,
         config,
+        getAutoCompactEnabled: () => pi.getSettings().compaction?.enabled ?? true,
         getThinkingLevel: () => pi.getThinkingLevel(),
       });
     });

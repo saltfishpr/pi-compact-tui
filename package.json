@@ -18,6 +18,7 @@
   "files": [
     "packages",
     "!packages/**/*.test.ts",
+    "!packages/**/*.bench.ts",
     "!packages/**/*.manual.ts",
     "README.md",
     "README.zh.md",
@@ -42,6 +43,7 @@
   },
   "scripts": {
     "test": "vitest run",
+    "bench:footer": "vitest bench --run packages/pi-compact-footer/footer.bench.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
