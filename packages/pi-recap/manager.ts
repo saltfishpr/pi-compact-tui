@@ -55,13 +55,11 @@ export class RecapManager {
   async run(ctx: ExtensionContext, options: { force?: boolean } = {}): Promise<void> {
     if (this.active && !options.force) return;
 
-    const agentMessages = ctx.sessionManager
-      .getBranch()
-      .filter((entry) => entry.type === "message")
-      .map((entry) => entry.message);
-    const messages = convertToLlm(agentMessages);
+    // 使用模型可见的上下文，避免重新引入已编辑或压缩掉的原始消息，并保留摘要。
+    const { messages: agentMessages } = ctx.sessionManager.buildSessionProjection();
+    const messages = convertToLlm(agentMessages.filter((message) => message.role !== "system"));
 
-    // 会话中没有消息时跳过 recap，避免无意义的模型调用。
+    // 没有会话内容时跳过 recap；system prompt 本身不构成需要回顾的对话。
     if (messages.length === 0) return;
 
     this.cancelInflight();
@@ -152,6 +150,12 @@ export class RecapManager {
       );
       const response = await stream.result();
 
+      // Provider 可以正常返回失败消息而不 reject，部分文本不能作为有效 recap。
+      if (signal.aborted || response.stopReason === "aborted") return { kind: "aborted" };
+      if (response.stopReason === "error") {
+        return { kind: "failed", reason: response.errorMessage ?? "recap request failed" };
+      }
+
       // 仅保留文本块，忽略思考过程等非展示内容。
       const content = response.content
         .filter((block) => block.type === "text")
@@ -167,7 +171,7 @@ export class RecapManager {
     }
   }
 
-  // 从当前会话分支构造提示词：过滤出消息条目并按时间序列化，必要时尾部截断。
+  // 将投影后的会话上下文序列化为提示词，必要时尾部截断。
   private buildPrompt(messages: Message[]): string {
     const text = serializeConversation(messages);
     // 超长时保留末尾片段，确保最近的任务上下文不被丢弃。
