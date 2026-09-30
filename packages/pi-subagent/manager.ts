@@ -189,6 +189,7 @@ class AgentThread {
         await session.prompt(material ? `${task}\n\n${material}` : task);
       } finally {
         unsubscribe();
+        this.syncUsage();
       }
 
       if (this.aborted) return this.buildResult("aborted");
@@ -213,6 +214,18 @@ class AgentThread {
     }
   }
 
+  private syncUsage(): void {
+    if (!this.session) return;
+    const { tokens, cost } = this.session.getSessionStats();
+    this.usage = {
+      input: tokens.input,
+      output: tokens.output,
+      cacheRead: tokens.cacheRead,
+      cacheWrite: tokens.cacheWrite,
+      cost,
+    };
+  }
+
   private onEvent(event: AgentSessionEvent): void {
     switch (event.type) {
       case "tool_execution_start": {
@@ -220,10 +233,25 @@ class AgentThread {
         this.publish();
         break;
       }
+      case "compaction_end": {
+        if (event.result?.usage) {
+          this.syncUsage();
+          this.publish();
+        }
+        break;
+      }
+      case "entry_appended": {
+        this.syncUsage();
+        this.publish();
+        break;
+      }
       case "message_end": {
         const message = event.message;
+        // message_end is emitted before persistence, so include its usage directly for the live widget.
+        if ((message.role === "assistant" || message.role === "toolResult") && message.usage) {
+          addUsageToTotals(this.usage, message.usage);
+        }
         if (message.role === "assistant") {
-          if (message.usage) addUsageToTotals(this.usage, message.usage);
           if (!this.model && message.model) this.model = message.model;
           this.lastStopReason = message.stopReason;
           this.lastErrorMessage = message.errorMessage;
@@ -233,8 +261,9 @@ class AgentThread {
             .join("\n");
           if (text.trim()) this.lastActivity = { type: "text", text };
           this.lastAssistantText = text; // 记录最后一条 AssistantMessage 的文本，即使为空
-          this.publish();
         }
+        if (message.role === "assistant" || message.role === "toolResult") this.publish();
+        break;
       }
     }
   }
