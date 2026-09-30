@@ -9,7 +9,7 @@ const elementSchema = z.union([
     .object({
       kind: z.literal("literal"),
       value: singleLineTextSchema.min(1),
-      color: z.string(),
+      color: z.string().optional(),
     })
     .strict(),
   z

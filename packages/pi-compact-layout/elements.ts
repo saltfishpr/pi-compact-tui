@@ -183,13 +183,13 @@ export class LayoutElements {
     const built = this.buildAll(statuses);
     const resolveElement = (element: Element): string => {
       if (typeof element !== "string" && element.kind === "literal") {
-        let color = element.color as ThemeColor;
+        let color = element.color as ThemeColor | undefined;
         try {
-          theme.getFgAnsi(color);
+          if (color) theme.getFgAnsi(color);
         } catch {
-          color = "dim";
+          color = undefined;
         }
-        return theme.fg(color, element.value);
+        return color ? theme.fg(color, element.value) : theme.fg("dim", element.value);
       }
       const value = typeof element === "string" ? element : element.value;
       const key = getStatusKey(element);

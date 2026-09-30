@@ -122,7 +122,7 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 
 需要装饰元素时，使用 `{ "kind": "element", "value": "branch", "prefix": "(", "suffix": ")" }`。`value` 可以使用上表中的任意元素，包括 `status:<key>`。`prefix`、`suffix` 均可省略，默认为空字符串，仅在元素有内容时显示。默认布局通过这种配置显示 `(branch)`、`(provider)` 和 `model • thinkingLevel`；直接使用字符串元素时不带装饰。
 
-数组中也可以加入 `{ "kind": "literal", "value": "|", "color": "dim" }` 显示自定义单行文本。`color` 使用 Pi 主题的前景色名称，例如 `dim`、`accent`、`warning`；无效名称按 `dim` 显示。
+数组中也可以加入 `{ "kind": "literal", "value": "|" }` 显示自定义单行文本。`color` 是可选项，使用时填写 Pi 主题的前景色名称，例如 `dim`、`accent`、`warning`；未填写或名称无效时按 `dim` 显示。
 
 ### 输入历史（`pi-history`）
 

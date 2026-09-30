@@ -122,7 +122,7 @@ For example, move `status:codex-stats` from the footer to `editor.bottomRight` t
 
 To decorate an item, use `{ "kind": "element", "value": "branch", "prefix": "(", "suffix": ")" }`. `value` accepts any item above, including `status:<key>`. Optional `prefix` and `suffix` default to empty strings and appear only when the item has content. The default layout uses this to show `(branch)`, `(provider)`, and `model • thinkingLevel`; plain string items remain undecorated.
 
-Arrays can also contain `{ "kind": "literal", "value": "|", "color": "dim" }` for custom single-line text. `color` accepts a Pi theme foreground color name, such as `dim`, `accent`, or `warning`; invalid names fall back to `dim`.
+Arrays can also contain `{ "kind": "literal", "value": "|" }` for custom single-line text. `color` is optional; when provided, it accepts a Pi theme foreground color name, such as `dim`, `accent`, or `warning`. Missing or invalid colors fall back to `dim`.
 
 ### Input History (`pi-history`)
 
