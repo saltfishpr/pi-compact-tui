@@ -44,14 +44,52 @@ Intercepts bash commands executed by Pi, with two layers of protection:
 
 Field descriptions:
 
-- `model`: Audit model in `<provider>/<model-id>` format. Defaults to the current session model when omitted.
+- `enable`: Whether auditing is enabled. Defaults to `false`; completing `/audit` enables it automatically.
+- `model`: Audit model in `<provider>/<model-id>` format. If no model is configured or the model is unavailable, commands requiring model audit require manual confirmation instead.
 - `thinkingLevel`: `off` / `minimal` / `low` / `medium` / `high` / `xhigh` / `max`.
 - `timeoutMs`: Model audit timeout in milliseconds. Defaults to `10000`.
-- `rules`: Each rule contains:
-  - `command`: command name (for example, `pnpm`);
-  - `args`: arguments to match (for example, `["install"]`);
-  - `except`: exceptional argument combinations for which this rule does not apply;
-  - `action`: `allow` (allow directly) / `prompt` (require manual confirmation) / `auto` (audit with the model).
+- `rules`: Custom command rules. Defaults to an empty array; matching is described below.
+
+**Audit rules**
+
+Custom rules are checked in array order. The first matching rule without a matching exception takes effect. If no rule matches, the built-in read-only allowlist is used; other commands are sent to model audit. Custom rules take precedence over the built-in allowlist.
+
+Each rule contains:
+
+- `command`: Matches the command name exactly, such as `pnpm`; `/usr/bin/pnpm` is not automatically treated as `pnpm`.
+- `args`: Matches parsed arguments in order, not the entire command text. Omit it or use `[]` to match any arguments.
+- `except`: An optional array of exceptions in the form `[{ "args": ["..."] }]`. Any matching exception skips this rule and continues checking later rules; it does not reject the command outright.
+- `action`: `allow` (allow) / `prompt` (require manual confirmation) / `auto` (model audit, or manual confirmation if no model is available).
+
+Both `args` and each exception's `args` use the same argument patterns:
+
+| Pattern                        | Matching behavior                                                                                                              |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| A literal, such as `"install"` | Matches one argument exactly. An all-literal array matches a prefix, so `["install"]` also matches `install --frozen-lockfile` |
+| `"*"` or `"--*=*"`             | Matches one argument; `*` represents any length of text within that argument                                                   |
+| `"/regular expression/"`       | Matches one complete argument using a regular expression; trailing flags are not supported                                     |
+| `"**"`                         | Matches zero or more arguments                                                                                                 |
+
+An array containing a wildcard or regular expression must match the entire argument list; add `"**"` explicitly to allow additional arguments. For example, `["**", "-rf", "**"]` matches the standalone argument `-rf` anywhere in the list, but not `-fr` or other equivalent forms.
+
+This example `rules` array allows ordinary `pnpm install` calls but sends calls containing `--ignore-scripts` to model audit:
+
+```json
+[
+  {
+    "command": "pnpm",
+    "args": ["install"],
+    "except": [{ "args": ["install", "**", "--ignore-scripts", "**"] }],
+    "action": "allow"
+  },
+  { "command": "pnpm", "args": ["install"], "action": "auto" },
+  { "command": "rm", "args": ["**", "-rf", "**"], "action": "prompt" }
+]
+```
+
+Pipelines and compound commands combine the results of their parts, with priority `prompt` > `auto` > `allow`. Even when a rule returns `allow`, additional shell behavior such as write redirection or background execution may send the entire command to model audit. Dynamic commands or arguments are not directly allowed by these rules either.
+
+**Audit scope**: This extension audits only the main session's bash tool calls. It does not cover subagent bash tool calls or `!` commands in subagent profiles. Profile `!` commands use separate command approval; see “Command approval” in the Subagent section below.
 
 ### Clear and Start a New Session (`pi-clear-command`)
 
@@ -102,7 +140,7 @@ Customize the editor borders and footer to put model, usage, and Git information
 - `editor`: `topRight`, `bottomLeft`, and `bottomRight` place items in the corresponding editor corners. Set to `{}` to clear all three positions without affecting Pi's activity indicator or scrolling hints.
 - `separator`: Text between non-empty items in the same array. Defaults to one space.
 
-Items appear in array order, without built-in separators such as bullets or decorative parentheses. Use any item below in any position; move it to change its position, remove it to hide it, or repeat it to display it more than once. Omitting the entire `footer` or `editor` field keeps that section's default layout. Providing a field replaces its entire layout rather than merging with defaults; unspecified line sides or editor positions are empty. Content is truncated or hidden when space is limited, with Pi's activity indicator and scrolling hints taking priority.
+Items appear in array order, without built-in separators such as bullets or decorative parentheses. Use any item below in any position; move it to change its position or repeat it to display it more than once. Omitting the entire `footer` or `editor` field keeps that section's default layout. Providing a field replaces its entire layout rather than merging with defaults; unspecified line sides or editor positions are empty. Content is truncated or hidden when space is limited, with Pi's activity indicator and scrolling hints taking priority.
 
 **Available items**:
 
@@ -130,7 +168,7 @@ Press `Shift+↑` / `Shift+↓` in the input box to browse previous input. The l
 
 ### Session Recap (`pi-recap`)
 
-When a session is idle, automatically generates a short recap above the input box (what you are currently doing and the next step). It is cleared automatically when you begin a new input or resume work. You can also run `/recap` at any time to generate one manually.
+When a session is idle, automatically generates a short recap above the input box (what you are currently doing and the next step). It is cleared automatically when you submit a new input or resume work. You can also run `/recap` at any time to generate one manually.
 
 **Configuration**: Edit `~/.pi/agent/extensions/recap.json`:
 
@@ -150,9 +188,7 @@ When a session is idle, automatically generates a short recap above the input bo
 
 Provides Pi with an `agent` tool for delegating independent subtasks to subagents running in isolated contexts. Three subagents are included: `explore`, `planner`, and `reviewer`; you can add your own as well.
 
-![Subagent](./assets/subagent.png)
-
-**Add a subagent**: Place a Markdown file in `~/.pi/agents/` (global) or `.pi/agents/` (project). The filename becomes the subagent name:
+**Add a subagent**: Place a Markdown file in `~/.pi/agent/agents/` (global) or `.pi/agents/` (project). The filename becomes the subagent name:
 
 ```markdown
 ---
