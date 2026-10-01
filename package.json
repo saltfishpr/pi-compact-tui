@@ -30,7 +30,6 @@
       "./packages/pi-clear-command/index.ts",
       "./packages/pi-compact-layout/index.ts",
       "./packages/pi-history/index.ts",
-      "./packages/pi-provider-ark/index.ts",
       "./packages/pi-provider-stats/index.ts",
       "./packages/pi-recap/index.ts",
       "./packages/pi-subagent/index.ts",

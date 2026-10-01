@@ -4,7 +4,7 @@ This file provides guidance to AI agents when working with code in this reposito
 
 ## 项目概述
 
-这是一个 pi extension package，通过 pnpm workspace monorepo 组织，内含多个 extension，用于精简 TUI、补充状态信息，并提供输入历史、新会话快捷方式、Git 自动信任及额外模型 provider。
+这是一个 pi extension package，通过 pnpm workspace monorepo 组织，内含多个 extension，用于精简 TUI、补充状态信息，并提供输入历史、新会话快捷方式、Git 自动信任。
 
 ## 项目结构
 
@@ -14,8 +14,7 @@ pi-compact-tui/
 │   ├── pi-clear-command/index.ts    # /clear 命令，等价于 /new 开启新会话
 │   ├── pi-compact-layout/           # 可配置的 footer 和 editor 边框元素
 │   ├── pi-history/index.ts          # 输入历史，shift+↑/↓ 检索，跨会话持久化
-│   ├── pi-provider-ark/index.ts     # 注册 ark-coding-plan provider（火山方舟 Coding Plan）
-│   ├── pi-provider-stats/           # 各 provider 的订阅额度与账户余额
+│   ├── pi-provider-stats            # 各 provider 的订阅额度与账户余额
 │   └── pi-trust-git/index.ts        # 按 origin 远程的域名/用户名规则自动信任项目
 ├── package.json                     # pi package 清单 + workspace 配置
 ├── pnpm-workspace.yaml
@@ -97,7 +96,6 @@ README（`README.md` / `README.zh.md`）面向插件使用者，不是开发者�
 
 - `node_modules/@earendil-works/pi-coding-agent/docs/extensions.md` — Extension API、事件生命周期、命令、工具、状态管理与自定义 UI 的主参考。
 - `node_modules/@earendil-works/pi-coding-agent/docs/tui.md` — `@earendil-works/pi-tui` 组件、自定义编辑器和 footer 的实现模式。
-- `node_modules/@earendil-works/pi-coding-agent/docs/custom-provider.md` — 自定义 provider、模型定义与认证；修改 `pi-provider-ark` 时阅读。
 - `node_modules/@earendil-works/pi-coding-agent/docs/session-format.md` — session 条目格式与 `SessionManager`；修改历史、recap 或 subagent 的持久化逻辑时阅读。
 - `node_modules/@earendil-works/pi-coding-agent/docs/packages.md` — pi package 的扩展入口和运行时依赖约定。
 
