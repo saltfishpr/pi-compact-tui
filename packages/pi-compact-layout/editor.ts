@@ -65,6 +65,12 @@ export class CompactEditor extends CustomEditor {
     return Math.min(3, Math.max(0, width - statusWidth)) + statusWidth;
   }
 
+  /**
+   * Inserts padded labels into the border's leading and trailing horizontal strokes.
+   * The left label takes priority; both labels are truncated to preserve native border content.
+   * statusEnd marks the exclusive end column of a status indicator, whose trailing strokes
+   * must not be mistaken for available space. Resets isolate label styles and hyperlinks.
+   */
   private addLabels(border: string, width: number, left: string, right: string, statusEnd = 0): string {
     if (!left && !right) return border;
     const plainBorder = stripTerminalSequences(border);

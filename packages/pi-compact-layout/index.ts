@@ -6,9 +6,10 @@ import { CompactFooter } from "./footer";
 import { migrateConfig } from "./migrate";
 
 export default function (pi: ExtensionAPI) {
+  migrateConfig();
+
   pi.on("session_start", (_event, ctx) => {
     if (ctx.mode !== "tui") return;
-    migrateConfig();
     const config = loadConfig();
     // Keep the factory even for an empty footer: it provides native Git and extension status data.
     ctx.ui.setFooter((_tui, _theme, footerData) => {
