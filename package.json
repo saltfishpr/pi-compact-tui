@@ -38,7 +38,7 @@
       "./packages/pi-trust-git/index.ts",
       "./packages/pi-web-search/index.ts"
     ],
-    "image": "https://raw.githubusercontent.com/saltfishpr/pi-compact-tui/refs/heads/master/assets/recap.png"
+    "image": "https://raw.githubusercontent.com/saltfishpr/pi-compact-tui/refs/heads/master/assets/cover.png"
   },
   "scripts": {
     "test": "vitest run",
