@@ -15,7 +15,7 @@ pi-compact-tui/
 │   ├── pi-compact-layout/           # 可配置的 footer 和 editor 边框元素
 │   ├── pi-history/index.ts          # 输入历史，shift+↑/↓ 检索，跨会话持久化
 │   ├── pi-provider-ark/index.ts     # 注册 ark-coding-plan provider（火山方舟 Coding Plan）
-│   ├── pi-usage-stats/              # 各 provider 的订阅限流与账户余额状态
+│   ├── pi-provider-stats/           # 各 provider 的订阅额度与账户余额
 │   └── pi-trust-git/index.ts        # 按 origin 远程的域名/用户名规则自动信任项目
 ├── package.json                     # pi package 清单 + workspace 配置
 ├── pnpm-workspace.yaml

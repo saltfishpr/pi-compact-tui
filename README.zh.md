@@ -118,7 +118,7 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 | `extensionStatuses`                   | 未单独指定位置的其他扩展状态                                                        |
 | `status:<key>`                        | 指定扩展状态，例如 `status:codex-stats`；需要提供该状态的扩展已启用                 |
 
-例如，将 `status:codex-stats` 从 footer 移到 `editor.bottomRight`，即可在输入框右下显示 Codex 用量。单独指定位置的状态不会再出现在 `extensionStatuses` 中，扩展提供的颜色保持不变。订阅用量和账户余额由本包的 `pi-usage-stats` 提供，没有对应状态时不显示。
+例如，将 `status:codex-stats` 从 footer 移到 `editor.bottomRight`，即可在输入框右下显示 Codex 用量。单独指定位置的状态不会再出现在 `extensionStatuses` 中，扩展提供的颜色保持不变。订阅用量和账户余额由本包的 `pi-provider-stats` 提供，没有对应状态时不显示。
 
 需要装饰元素时，使用 `{ "kind": "element", "value": "branch", "prefix": "(", "suffix": ")" }`。`value` 可以使用上表中的任意元素，包括 `status:<key>`。`prefix`、`suffix` 均可省略，默认为空字符串，仅在元素有内容时显示。默认布局通过这种配置显示 `(branch)`、`(provider)` 和 `model • thinkingLevel`；直接使用字符串元素时不带装饰。
 
@@ -205,7 +205,7 @@ maxTurns: 30
 - `domains`：信任的远程域名（如 `github.com`、`gitlab.com`）。
 - `usernames`：信任的远程路径首段（如 `github.com/saltfishpr/xxx` 中的 `saltfishpr`）。
 
-### 用量状态（`pi-usage-stats`）
+### 订阅额度与余额（`pi-provider-stats`）
 
 在状态栏展示当前模型的 provider 用量：
 

@@ -118,7 +118,7 @@ Items appear in array order, without built-in separators such as bullets or deco
 | `extensionStatuses`                   | Other extension statuses without an explicitly assigned position                                                                  |
 | `status:<key>`                        | A specific extension status, such as `status:codex-stats`; requires the extension providing that status to be enabled             |
 
-For example, move `status:codex-stats` from the footer to `editor.bottomRight` to show Codex usage in the editor's bottom-right border. Explicitly positioned statuses are excluded from `extensionStatuses`, and extension-provided colors are preserved. Subscription usage and account balances are supplied by this package's `pi-usage-stats` extension and are hidden when no matching status is available.
+For example, move `status:codex-stats` from the footer to `editor.bottomRight` to show Codex usage in the editor's bottom-right border. Explicitly positioned statuses are excluded from `extensionStatuses`, and extension-provided colors are preserved. Subscription usage and account balances are supplied by this package's `pi-provider-stats` extension and are hidden when no matching status is available.
 
 To decorate an item, use `{ "kind": "element", "value": "branch", "prefix": "(", "suffix": ")" }`. `value` accepts any item above, including `status:<key>`. Optional `prefix` and `suffix` default to empty strings and appear only when the item has content. The default layout uses this to show `(branch)`, `(provider)`, and `model • thinkingLevel`; plain string items remain undecorated.
 
@@ -205,7 +205,7 @@ Automatically trusts projects based on their Git `origin` remote, skipping Pi's 
 - `domains`: Trusted remote domains (such as `github.com` and `gitlab.com`).
 - `usernames`: Trusted first path segments in remotes (for example, `saltfishpr` in `github.com/saltfishpr/xxx`).
 
-### Usage Status (`pi-usage-stats`)
+### Subscription Quotas and Balances (`pi-provider-stats`)
 
 Displays provider usage for the current model in the status bar:
 

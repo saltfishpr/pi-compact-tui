@@ -31,11 +31,11 @@
       "./packages/pi-compact-layout/index.ts",
       "./packages/pi-history/index.ts",
       "./packages/pi-provider-ark/index.ts",
+      "./packages/pi-provider-stats/index.ts",
       "./packages/pi-recap/index.ts",
       "./packages/pi-subagent/index.ts",
       "./packages/pi-tips/index.ts",
       "./packages/pi-trust-git/index.ts",
-      "./packages/pi-usage-stats/index.ts",
       "./packages/pi-web-search/index.ts"
     ],
     "image": "https://raw.githubusercontent.com/saltfishpr/pi-compact-tui/refs/heads/master/assets/recap.png"
