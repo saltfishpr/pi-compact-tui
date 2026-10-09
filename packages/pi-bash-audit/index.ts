@@ -1,13 +1,13 @@
-import { getSupportedThinkingLevels, type Api, type Model, type ModelThinkingLevel } from "@earendil-works/pi-ai";
+import { getSupportedThinkingLevels, type ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { ExtensionContext, isToolCallEventType, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Container, Text } from "@earendil-works/pi-tui";
 
 import { createLogger, resolveModel, ScrollableSelectorComponent } from "../pi-common";
-import { auditCommand } from "./auditor";
-import { loadConfig, saveConfig, type BashAuditConfig, type Rule } from "./config";
+import { auditCommand, type AuditModel } from "./auditor";
+import { loadConfig, saveConfig, type BashAuditConfig } from "./config";
 import { createRulePolicy } from "./rules";
 import { selectAuditModel, selectAuditThinkingLevel } from "./selector";
-import { createScriptEvaluator, defaultPolicy, type Action } from "./shell";
+import { createScriptEvaluator, defaultPolicy } from "./shell";
 
 const logger = createLogger("pi-bash-audit");
 
@@ -31,7 +31,7 @@ export default function (pi: ExtensionAPI) {
   if (process.platform === "win32") return;
 
   let config = loadConfig();
-  let resolvedModel: Model<Api> | undefined;
+  let resolvedModel: AuditModel | undefined;
   let thinkingLevel: ModelThinkingLevel = "off";
   let evaluateScript = createScriptEvaluator(defaultPolicy);
 
@@ -55,16 +55,21 @@ export default function (pi: ExtensionAPI) {
       model: auditConfig.model,
       thinkingLevel: auditConfig.thinkingLevel,
     });
-    if (!resolved) {
-      if (auditConfig.model) {
-        ctx.ui.notify(`[bash-audit] model "${auditConfig.model}" not found, auto bash-audit disabled`, "warning");
-      } else {
-        ctx.ui.notify(`[bash-audit] no model configured, run "/audit" to select one`);
-      }
+    if (resolved) {
+      resolvedModel = resolved.model;
+      thinkingLevel = resolved.thinkingLevel;
       return;
     }
-    resolvedModel = resolved.model;
-    thinkingLevel = resolved.thinkingLevel;
+    if (auditConfig.model) {
+      const [provider, ...modelId] = auditConfig.model.split("/");
+      resolvedModel = ctx.modelRegistry.findOfType("classifier", provider, modelId.join("/"));
+    }
+    if (!resolvedModel) {
+      const message = auditConfig.model
+        ? `model "${auditConfig.model}" not found, auto bash-audit disabled`
+        : 'no model configured, run "/audit" to select one';
+      ctx.ui.notify(`[bash-audit] ${message}`, "warning");
+    }
   }
 
   pi.registerCommand("audit", {
@@ -77,20 +82,26 @@ export default function (pi: ExtensionAPI) {
         return;
       }
 
-      const models = ctx.modelRegistry.getAvailable();
-      const previousModel = config.model
-        ? models.find((model) => `${model.provider}/${model.id}` === config.model)
-        : undefined;
+      const classifiers = await ctx.modelRegistry.getAvailableOfType("classifier", undefined, { signal: ctx.signal });
+      const models: AuditModel[] = [...ctx.modelRegistry.getAvailable(), ...classifiers];
+      if (models.length === 0) {
+        ctx.ui.notify("[bash-audit] no audit models available; configure provider authentication first", "warning");
+        return;
+      }
+      const previousModel = models.find((model) => `${model.provider}/${model.id}` === config.model);
       const selectedModel = await selectAuditModel(ctx, models, previousModel);
       if (!selectedModel) return;
 
       const modelId = `${selectedModel.provider}/${selectedModel.id}`;
-      const availableLevels = getSupportedThinkingLevels(selectedModel);
-      const configuredLevel = config.model === modelId ? (config.thinkingLevel ?? "off") : "off";
-      const initialLevel = availableLevels.includes(configuredLevel) ? configuredLevel : "off";
-      const selectedLevel = await selectAuditThinkingLevel(ctx, initialLevel, availableLevels);
-      if (!selectedLevel) return;
-
+      let selectedLevel: ModelThinkingLevel = "off";
+      if (selectedModel.type !== "classifier") {
+        const availableLevels = getSupportedThinkingLevels(selectedModel);
+        const configuredLevel = config.model === modelId ? (config.thinkingLevel ?? "off") : "off";
+        const initialLevel = availableLevels.includes(configuredLevel) ? configuredLevel : "off";
+        const level = await selectAuditThinkingLevel(ctx, initialLevel, availableLevels);
+        if (!level) return;
+        selectedLevel = level;
+      }
       try {
         saveConfig({
           enable: true,
@@ -105,7 +116,8 @@ export default function (pi: ExtensionAPI) {
 
       config = loadConfig(); // reload config
       initializeAudit(config, ctx);
-      ctx.ui.notify(`[bash-audit] enabled with ${modelId} (${selectedLevel})`, "info");
+      const suffix = selectedModel.type === "classifier" ? "" : ` (${selectedLevel})`;
+      ctx.ui.notify(`[bash-audit] enabled with ${modelId}${suffix}`, "info");
     },
   });
 
@@ -159,6 +171,8 @@ export default function (pi: ExtensionAPI) {
       kind: result.kind,
       risk: result.kind === "ok" ? result.risk : undefined,
       text: result.kind === "aborted" ? undefined : result.text,
+      probability: result.kind === "ok" ? result.probability : undefined,
+      reason: result.kind === "aborted" ? undefined : result.reason,
     });
 
     if (result.kind === "aborted") {
@@ -174,19 +188,21 @@ export default function (pi: ExtensionAPI) {
       return proceed ? undefined : { block: true, reason: "bash-audit: confirmation declined" };
     }
 
+    let confirmationReason: string;
     if (result.risk === "high") {
-      const proceed = await confirmWithScrollableMessage(
-        ctx,
-        `High-risk command: ${result.reason}`,
-        `Command:\n${command}\n\nAllow execution?`,
-      );
-      return proceed ? undefined : { block: true, reason: "bash-audit: confirmation declined" };
+      confirmationReason = `High-risk command: ${result.reason}`;
+    } else if (result.probability !== undefined && result.probability < config.minProbability) {
+      confirmationReason = `Uncertain audit (requires probability >= ${config.minProbability}): ${result.reason}`;
+    } else {
+      pi.appendEntry<AuditEntryData>(ENTRY_TYPE, {
+        risk: result.risk,
+        message: `${result.risk}: ${result.reason}`,
+      });
+      return;
     }
 
-    pi.appendEntry<AuditEntryData>(ENTRY_TYPE, {
-      risk: result.risk,
-      message: `${result.risk}: ${result.reason}`,
-    });
+    const proceed = await confirmWithScrollableMessage(ctx, confirmationReason, `Command:\n${command}\n\nAllow execution?`);
+    return proceed ? undefined : { block: true, reason: "bash-audit: confirmation declined" };
   });
 }
 

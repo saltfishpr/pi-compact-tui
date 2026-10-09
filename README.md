@@ -23,11 +23,11 @@ Configuration files for all extensions are stored in `~/.pi/agent/extensions/`. 
 Intercepts bash commands executed by Pi, with two layers of protection:
 
 1. **Rule matching**: includes a built-in allowlist of read-only commands (such as `ls`, `cat`, and `git status`), which are allowed directly. Rules can also explicitly allow a command, require confirmation, or send it to the model for auditing.
-2. **Model audit**: commands not allowed by a rule are evaluated for risk by the selected model. High-risk commands display a confirmation dialog for you to decide whether to run them.
+2. **Model audit**: commands not allowed by a rule are evaluated for risk by the selected chat model or classifier, including [JEV](https://openrouter.ai/typesafe/jev-1.13). High-risk commands require manual confirmation. Classifier decisions also require confirmation when the selected category's probability is below the configured threshold.
 
 ![Command Audit](./assets/audit.png)
 
-**Configuration**: Run `/audit` to select the audit model and reasoning level, or edit `~/.pi/agent/extensions/bash-audit.json` directly:
+**Configuration**: Run `/audit` to select a chat model or classifier and enable auditing. Chat models also let you select a reasoning level; classifiers skip this step. You can also edit `~/.pi/agent/extensions/bash-audit.json` directly:
 
 ```json
 {
@@ -35,6 +35,7 @@ Intercepts bash commands executed by Pi, with two layers of protection:
   "model": "anthropic/claude-sonnet-4-5",
   "thinkingLevel": "off",
   "timeoutMs": 10000,
+  "minProbability": 0.9,
   "rules": [
     { "command": "pnpm", "args": ["install"], "action": "allow" },
     { "command": "rm", "args": ["-rf"], "action": "prompt" }
@@ -44,11 +45,14 @@ Intercepts bash commands executed by Pi, with two layers of protection:
 
 Field descriptions:
 
-- `enable`: Whether auditing is enabled. Defaults to `false`; completing `/audit` enables it automatically.
-- `model`: Audit model in `<provider>/<model-id>` format. If no model is configured or the model is unavailable, commands requiring model audit require manual confirmation instead.
-- `thinkingLevel`: `off` / `minimal` / `low` / `medium` / `high` / `xhigh` / `max`.
+- `enable`: Whether automatic model auditing and custom rules are enabled. Defaults to `false`; completing `/audit` enables them. When disabled, only the built-in read-only allowlist runs automatically; other commands require confirmation.
+- `model`: Audit model in `<provider>/<model-id>` format. Supports chat models and classifiers. If no model is configured or the model is unavailable, commands requiring model audit require manual confirmation instead. Existing chat-model configurations continue to work.
+- `thinkingLevel`: `off` / `minimal` / `low` / `medium` / `high` / `xhigh` / `max`. Applies only to chat models.
 - `timeoutMs`: Model audit timeout in milliseconds. Defaults to `10000`.
+- `minProbability`: Minimum probability of the selected low- or medium-risk category for automatic execution by a classifier, from `0` to `1`. Defaults to `0.9`; chat-model audits are unaffected. High-risk commands always require confirmation. Classifier audit messages show the category and probability instead of a generated explanation.
 - `rules`: Custom command rules. Defaults to an empty array; matching is described below.
+
+To use JEV, configure OpenRouter authentication in Pi or set `OPENROUTER_API_KEY`, then select `openrouter/typesafe/jev-1.13` in `/audit` or set it as `model` in the configuration.
 
 **Audit rules**
 

@@ -23,11 +23,11 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 拦截 Pi 执行的 bash 命令，分两级防护：
 
 1. **规则匹配**：内置一份"只读命令白名单"（如 `ls`、`cat`、`git status` 等），命中的直接放行；也可以用规则强制放行、强制确认或交给模型审计。
-2. **模型审计**：规则未放行的命令交给指定模型判断风险，高风险命令弹出确认框，由你决定是否执行。
+2. **模型审计**：规则未放行的命令交给所选聊天模型或 classifier 判断风险，支持 [JEV](https://openrouter.ai/typesafe/jev-1.13) 等决策模型。高风险命令需要人工确认；使用 classifier 时，所选类别的概率低于配置阈值也需要确认。
 
 ![命令审计](./assets/audit.png)
 
-**配置**：运行 `/audit` 选择审计模型和推理档位即可启用，也可以直接编辑 `~/.pi/agent/extensions/bash-audit.json`：
+**配置**：运行 `/audit` 选择聊天模型或 classifier 并启用审计。聊天模型还需选择推理档位，classifier 会跳过这一步。也可以直接编辑 `~/.pi/agent/extensions/bash-audit.json`：
 
 ```json
 {
@@ -35,6 +35,7 @@ pi install git:github.com/saltfishpr/pi-compact-tui
   "model": "anthropic/claude-sonnet-4-5",
   "thinkingLevel": "off",
   "timeoutMs": 10000,
+  "minProbability": 0.9,
   "rules": [
     { "command": "pnpm", "args": ["install"], "action": "allow" },
     { "command": "rm", "args": ["-rf"], "action": "prompt" }
@@ -44,11 +45,14 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 
 字段说明：
 
-- `enable`：是否启用审计，默认为 `false`；通过 `/audit` 完成选择后自动启用。
-- `model`：审计模型，格式 `<provider>/<model-id>`。未配置或模型不可用时，需要审计的命令改为人工确认。
-- `thinkingLevel`：`off` / `minimal` / `low` / `medium` / `high` / `xhigh` / `max`。
+- `enable`：是否启用自动模型审计和自定义规则，默认为 `false`；通过 `/audit` 完成选择后自动启用。关闭时仅内置只读白名单自动放行，其余命令需要确认。
+- `model`：审计模型，格式 `<provider>/<model-id>`，支持聊天模型和 classifier。未配置或模型不可用时，需要审计的命令改为人工确认。已有聊天模型配置继续有效。
+- `thinkingLevel`：`off` / `minimal` / `low` / `medium` / `high` / `xhigh` / `max`，仅对聊天模型生效。
 - `timeoutMs`：模型审计超时时间，单位为毫秒，默认为 `10000`。
+- `minProbability`：classifier 判定为低、中风险时自动执行所需的最低概率，取值 `0` 到 `1`，默认为 `0.9`，不影响聊天模型审计。高风险始终需要确认。classifier 审计消息展示风险类别与概率，不生成解释。
 - `rules`：自定义命令规则，默认为空数组，匹配方式见下文。
+
+使用 JEV 时，先在 Pi 中配置 OpenRouter 认证或设置 `OPENROUTER_API_KEY`，然后在 `/audit` 中选择 `openrouter/typesafe/jev-1.13`，或将配置中的 `model` 改为该值。
 
 **审计规则**
 
