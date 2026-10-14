@@ -16,39 +16,39 @@ export default function (pi: ExtensionAPI) {
     ctx.ui.setWorkingMessage(message);
   };
 
-  pi.on("agent_start", (_event, ctx) => setWorkingMessage(ctx, "Working…"));
-  pi.on("turn_start", (_event, ctx) => setWorkingMessage(ctx, "Working…"));
+  pi.on("agent_start", (_event, ctx) => setWorkingMessage(ctx, "Working"));
+  pi.on("turn_start", (_event, ctx) => setWorkingMessage(ctx, "Working"));
   pi.on("message_start", (event, ctx) => {
-    if (event.message.role === "assistant") setWorkingMessage(ctx, "Waiting…");
+    if (event.message.role === "assistant") setWorkingMessage(ctx, "Waiting");
   });
   pi.on("message_update", (event, ctx) => {
     switch (event.assistantMessageEvent.type) {
       case "thinking_start":
       case "thinking_delta":
-        setWorkingMessage(ctx, "Thinking…");
+        setWorkingMessage(ctx, "Thinking");
         break;
       case "text_start":
       case "text_delta":
-        setWorkingMessage(ctx, "Streaming…");
+        setWorkingMessage(ctx, "Streaming");
         break;
       case "toolcall_start":
       case "toolcall_delta":
-        setWorkingMessage(ctx, "Preparing tools…");
+        setWorkingMessage(ctx, "Preparing tools");
         break;
     }
   });
   pi.on("message_end", (event, ctx) => {
-    if (event.message.role === "assistant") setWorkingMessage(ctx, "Working…");
+    if (event.message.role === "assistant") setWorkingMessage(ctx, "Working");
   });
   pi.on("tool_execution_start", (event, ctx) => {
     if (ctx.mode !== "tui") return;
     activeTools.add(event.toolCallId);
-    setWorkingMessage(ctx, "Running tools…");
+    setWorkingMessage(ctx, "Running tools");
   });
   pi.on("tool_execution_end", (event, ctx) => {
     if (ctx.mode !== "tui") return;
     activeTools.delete(event.toolCallId);
-    if (activeTools.size === 0) setWorkingMessage(ctx, "Working…");
+    if (activeTools.size === 0) setWorkingMessage(ctx, "Working");
   });
   pi.on("agent_end", (_event, ctx) => {
     activeTools.clear();
