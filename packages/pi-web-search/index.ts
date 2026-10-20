@@ -2,6 +2,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { createLogger } from "../pi-common";
 import { loadConfig, type WebSearchConfig } from "./config";
 import { createBigModelSearchProvider } from "./providers/bigmodel";
+import { createDeepSeekSearchProvider } from "./providers/deepseek";
 import { registerWebSearchTool } from "./tool";
 import {
   REGISTER_SEARCH_PROVIDER_EVENT,
@@ -47,11 +48,19 @@ export default function (pi: ExtensionAPI) {
     }
   });
 
-  pi.on("session_start", () => {
+  pi.on("session_start", (_event, ctx) => {
     config = loadConfig();
 
     if (config.providers.bigmodel) {
       pi.events.emit(REGISTER_SEARCH_PROVIDER_EVENT, createBigModelSearchProvider(config.providers.bigmodel));
+    }
+    if (config.providers.deepseek || config.provider === "deepseek") {
+      pi.events.emit(
+        REGISTER_SEARCH_PROVIDER_EVENT,
+        createDeepSeekSearchProvider(config.providers.deepseek ?? {}, () =>
+          ctx.modelRegistry.getApiKeyForProvider("deepseek"),
+        ),
+      );
     }
 
     const active = pi.getActiveTools();

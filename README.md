@@ -293,7 +293,22 @@ Built-in provider for BigModel web search. To enable it, add your API key to `~/
 
 `searchEngine` can be `search_std` (default), `search_pro`, `search_pro_sogou`, or `search_pro_quark`.
 
-**Migrating from Brave or Tavily:** These built-in providers are no longer available. Existing `provider: "brave"` or `provider: "tavily"` settings will not enable search. Switch to BigModel or register a custom provider using the guide above.
+#### DeepSeek
+
+Built-in provider for [DeepSeek web search](https://api-docs.deepseek.com/api/search/). It uses the DeepSeek credentials configured in Pi by default. To enable it, set the following in `~/.pi/agent/extensions/web-search.json`:
+
+```json
+{
+  "provider": "deepseek",
+  "maxResults": 5
+}
+```
+
+You can override the credentials with `providers.deepseek.apiKey`. To enable DeepSeek while keeping another default provider, add `"deepseek": {}` under `providers`.
+
+Queries must contain 1–128 Unicode characters and cannot be blank. Search operators such as `site:`, `-site:`, and quoted phrases are supported. Results use the long summary when available, falling back to the short snippet.
+
+**Migrating from Brave or Tavily:** These built-in providers are no longer available. Existing `provider: "brave"` or `provider: "tavily"` settings will not enable search. Switch to BigModel or DeepSeek, or register a custom provider using the guide above.
 
 ## License
 

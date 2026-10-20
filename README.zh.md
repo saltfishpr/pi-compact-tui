@@ -293,7 +293,22 @@ maxTurns: 30
 
 `searchEngine` 可选 `search_std`（默认）、`search_pro`、`search_pro_sogou` 或 `search_pro_quark`。
 
-**从 Brave 或 Tavily 迁移**：内置的 Brave、Tavily provider 已移除。原有的 `provider: "brave"` 或 `provider: "tavily"` 配置不会启用搜索。请改用 BigModel，或按上面的开发指南注册自定义 provider。
+#### DeepSeek
+
+内置 [DeepSeek 联网搜索](https://api-docs.deepseek.com/zh-cn/api/search/) provider，默认使用 Pi 中已配置的 DeepSeek 凭据。要启用它，在 `~/.pi/agent/extensions/web-search.json` 中配置：
+
+```json
+{
+  "provider": "deepseek",
+  "maxResults": 5
+}
+```
+
+可通过 `providers.deepseek.apiKey` 显式指定 API Key，优先于 Pi 中的凭据。若要保留其他默认 provider，同时启用 DeepSeek，在 `providers` 中添加 `"deepseek": {}` 即可。
+
+查询词须为 1～128 个 Unicode 字符，且不能全为空白；支持 `site:`、`-site:`、引号等搜索语法。结果优先使用长摘要，缺失时回退到短摘要。
+
+**从 Brave 或 Tavily 迁移**：内置的 Brave、Tavily provider 已移除。原有的 `provider: "brave"` 或 `provider: "tavily"` 配置不会启用搜索。请改用 BigModel 或 DeepSeek，或按上面的开发指南注册自定义 provider。
 
 ## License
 

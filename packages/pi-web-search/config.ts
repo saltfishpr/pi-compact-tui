@@ -1,13 +1,19 @@
 import * as z from "zod";
 import { getGlobalConfigPath, loadJSONConfig } from "../pi-common";
 import { bigmodelProviderConfigSchema } from "./providers/bigmodel";
+import { deepseekProviderConfigSchema } from "./providers/deepseek";
 
 const CONFIG_FILE_NAME = "web-search.json";
 
 const webSearchConfigSchema = z.object({
   provider: z.string().min(1).optional(),
   maxResults: z.number().int().min(1).max(10).default(5),
-  providers: z.object({ bigmodel: bigmodelProviderConfigSchema.optional() }).default({}),
+  providers: z
+    .object({
+      bigmodel: bigmodelProviderConfigSchema.optional(),
+      deepseek: deepseekProviderConfigSchema.optional(),
+    })
+    .default({}),
 });
 
 export type WebSearchConfig = z.infer<typeof webSearchConfigSchema>;
