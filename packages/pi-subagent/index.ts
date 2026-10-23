@@ -52,20 +52,6 @@ function reportDiagnostics(ctx: ExtensionContext, diagnostics: AgentDiagnostic[]
   }
 }
 
-function escapeXml(text: string): string {
-  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
-function formatAvailableAgents(agents: AgentProfile[]): string {
-  const entries = agents
-    .map(
-      (agent) =>
-        `  <subagent>\n    <name>${escapeXml(agent.name)}</name>\n    <description>${escapeXml(agent.description)}</description>\n  </subagent>`,
-    )
-    .join("\n");
-  return `<available_subagents>\n${entries}\n</available_subagents>`;
-}
-
 function applyAgentOverrides(profiles: AgentProfile[], config: SubagentConfig): AgentProfile[] {
   return profiles.map((profile) => {
     const override = config.agents[profile.name];
@@ -362,10 +348,12 @@ export default function (pi: ExtensionAPI) {
     ctx.ui.setWidget(WIDGET_KEY, createSubagentWidget(manager), { placement: "aboveEditor" });
   });
 
-  pi.on("before_agent_start", async (event) => {
+  pi.on("before_agent_start", (event) => {
     if (agents.length === 0) return;
 
-    return { systemPrompt: `${event.systemPrompt}\n\n${formatAvailableAgents(agents)}` };
+    event.systemPromptOptions.sections.available_subagents = agents
+      .map((agent) => `- \`${agent.name}\`: ${agent.description}`)
+      .join("\n");
   });
 
   pi.on("session_shutdown", async (_event, ctx) => {
