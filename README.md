@@ -170,6 +170,35 @@ Arrays can also contain `{ "kind": "literal", "value": "|" }` for custom single-
 
 Press `Shift+↑` / `Shift+↓` in the input box to browse previous input. The latest 100 entries are persisted across sessions.
 
+### Model Instructions (`pi-model-instructions`)
+
+Appends a model-specific Markdown file to the system prompt while keeping your global and project `AGENTS.md` instructions. Use `/model-instructions` to preview the matching file and see the last injection.
+
+**Configuration**: Edit `~/.pi/agent/extensions/model-instructions.json`:
+
+```json
+{
+  "rules": [
+    {
+      "provider": "anthropic",
+      "model": "claude-*",
+      "file": "model-instructions/claude/AGENTS.md"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-*",
+      "file": "model-instructions/gpt/AGENTS.md"
+    }
+  ]
+}
+```
+
+- `provider` and `model` match the selected provider and model ID, including virtual models. Matching is case-sensitive; only `*` is a wildcard. `openai` and `openai-codex` are separate providers.
+- The first matching rule wins. Put specific rules first; use `"provider": "*", "model": "*"` in a final rule for a default file. The default configuration has no rules.
+- `file` is relative to the configuration directory, so the first example reads `~/.pi/agent/extensions/model-instructions/claude/AGENTS.md`. Absolute paths and `~/` are also supported. Files are read as plain text; the filename can be any Markdown filename.
+
+Model switches and configuration or file edits take effect on the next run. A run includes its tool calls and follow-up model requests. An unmatched model, empty file, or loading error adds no model-specific instructions; errors are reported and old file contents are not reused. Switching instructions preserves the conversation history and its previous effects; start a new session when you need a fresh context. This extension does not apply to this package's subagent sessions.
+
 ### Session Recap (`pi-recap`)
 
 When a session is idle, automatically generates a short recap above the input box (what you are currently doing and the next step). It is cleared automatically when you submit a new input or resume work. You can also run `/recap` at any time to generate one manually.

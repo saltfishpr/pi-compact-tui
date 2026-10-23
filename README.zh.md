@@ -170,6 +170,35 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 
 按 `Shift+↑` / `Shift+↓` 在输入框中翻阅历史输入，跨会话持久保存（保留最近 100 条）。
 
+### 模型专属指令（`pi-model-instructions`）
+
+按当前模型将对应 Markdown 文件追加到 system prompt，保留原有全局和项目 `AGENTS.md` 指令。运行 `/model-instructions` 可预览命中文件，并查看最近一次注入记录。
+
+**配置**：编辑 `~/.pi/agent/extensions/model-instructions.json`：
+
+```json
+{
+  "rules": [
+    {
+      "provider": "anthropic",
+      "model": "claude-*",
+      "file": "model-instructions/claude/AGENTS.md"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-*",
+      "file": "model-instructions/gpt/AGENTS.md"
+    }
+  ]
+}
+```
+
+- `provider` 和 `model` 匹配当前选择的 provider 与模型 ID，包括虚拟模型。匹配区分大小写，仅 `*` 表示通配符。`openai` 和 `openai-codex` 是不同的 provider。
+- 按顺序选择第一条匹配规则，精确规则应放在前面。需要默认文件时，在末尾添加 `"provider": "*", "model": "*"` 的规则。默认配置没有规则。
+- `file` 相对配置文件目录解析，因此第一个示例读取 `~/.pi/agent/extensions/model-instructions/claude/AGENTS.md`。也支持绝对路径和 `~/`。文件正文按纯文本读取，文件名可以是任意 Markdown 文件名。
+
+切换模型、修改配置或文件后，从下一次 run 生效；一次 run 包含其工具调用及后续模型请求。未匹配、空文件或加载失败时，本轮不追加模型专属指令；加载错误会报告，旧文件内容不会复用。切换指令会保留对话历史及此前指令的影响，需要全新上下文时请开启新会话。本 extension 不作用于本包的 subagent 子会话。
+
 ### 会话回顾（`pi-recap`）
 
 会话空闲时在输入框上方自动生成一句简短的回顾（当前在做什么、下一步是什么），提交新输入或恢复工作后自动清除；也可以随时运行 `/recap` 手动生成。
