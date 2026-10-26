@@ -49,7 +49,15 @@ export const layoutConfigSchema = z
     footer: z.array(footerLineSchema).default([
       {
         left: ["pwd", { kind: "element", value: "branch", prefix: "(", suffix: ")" }, "sessionName"],
-        right: ["status:codex-stats", "status:deepseek-stats", "status:zai-stats", "cacheHitRate", "cost", "context"],
+        right: [
+          "status:codex-stats",
+          "status:deepseek-stats",
+          "status:opencode-go-stats",
+          "status:zai-stats",
+          "cacheHitRate",
+          "cost",
+          "context",
+        ],
       },
       { left: ["extensionStatuses"], right: [] },
     ]),

@@ -40,11 +40,17 @@ function parseResetAt(window: CodexRateWindow, fetchedAt: number): number | unde
   return undefined;
 }
 
+function formatWindowLabel(seconds: number): string {
+  if (seconds % 86_400 === 0) return `${seconds / 86_400}d`;
+  if (seconds % 3_600 === 0) return `${seconds / 3_600}h`;
+  return `${Math.round(seconds / 60)}m`;
+}
+
 function normalizeUsage(usage: CodexUsageResponse, fetchedAt: number): SubscriptionUsage {
   const windows = [usage.rate_limit?.primary_window, usage.rate_limit?.secondary_window]
     .filter((window): window is CodexRateWindow => window != null)
     .map((window) => ({
-      windowSeconds: window.limit_window_seconds,
+      label: formatWindowLabel(window.limit_window_seconds),
       usedPercent: parsePercent(window.used_percent),
       resetAtMs: parseResetAt(window, fetchedAt),
     }));

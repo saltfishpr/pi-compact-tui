@@ -118,6 +118,7 @@ Customize the editor borders and footer to put model, usage, and Git information
       "right": [
         "status:codex-stats",
         "status:deepseek-stats",
+        "status:opencode-go-stats",
         "status:zai-stats",
         "cacheHitRate",
         "cost",
@@ -280,6 +281,7 @@ Displays provider usage for the current model in the status bar:
 
 - **openai-codex**: Remaining subscription quota and relative reset time in the 5-hour / 7-day rate-limit windows.
 - **deepseek**: Account balance.
+- **opencode-go**: Remaining quota and relative reset time for the 5-hour / weekly subscription windows (`5h` / `7d`). Set `showMonthly: true` to also show the monthly window (`1mo`), which is hidden by default. Uses the OpenCode Go API key configured in Pi. Its layout status key is `status:opencode-go-stats`.
 - **zai-coding-cn** (Zhipu): Account balance.
 
 **Configuration**: Edit `~/.pi/agent/extensions/provider-stats.json` to disable individual providers, hide subscription reset times, or set the balance currency:
@@ -288,6 +290,7 @@ Displays provider usage for the current model in the status bar:
 {
   "providers": {
     "openai-codex": { "showResetTime": false },
+    "opencode-go": { "showMonthly": false },
     "deepseek": { "enabled": true, "currency": "CNY" }
   }
 }

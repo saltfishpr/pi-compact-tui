@@ -2,6 +2,7 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { ProviderConfig } from "../config";
 import { codexAdapter } from "./codex";
 import { deepseekAdapter } from "./deepseek";
+import { opencodeGoAdapter } from "./opencode-go";
 import { zaiAdapter } from "./zai";
 
 export type ProviderStatsKind = "balance" | "subscription";
@@ -20,4 +21,9 @@ export interface ProviderStatsAdapter {
   resetSession?(): void;
 }
 
-export const providerStatsAdapters: ProviderStatsAdapter[] = [codexAdapter, deepseekAdapter, zaiAdapter];
+export const providerStatsAdapters: ProviderStatsAdapter[] = [
+  codexAdapter,
+  deepseekAdapter,
+  opencodeGoAdapter,
+  zaiAdapter,
+];

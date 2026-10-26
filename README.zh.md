@@ -118,6 +118,7 @@ pi install git:github.com/saltfishpr/pi-compact-tui
       "right": [
         "status:codex-stats",
         "status:deepseek-stats",
+        "status:opencode-go-stats",
         "status:zai-stats",
         "cacheHitRate",
         "cost",
@@ -280,6 +281,7 @@ maxTurns: 30
 
 - **openai-codex**：订阅限流窗口（5h / 7d 剩余额度和相对重置时间）。
 - **deepseek**：账户余额。
+- **opencode-go**：订阅的 5 小时 / 每周剩余额度和相对重置时间（`5h` / `7d`）。每月额度（`1mo`）默认隐藏，可设置 `showMonthly: true` 开启。使用 Pi 中已配置的 OpenCode Go API Key，布局状态键为 `status:opencode-go-stats`。
 - **zai-coding-cn**（智谱）：账户余额。
 
 **配置**：编辑 `~/.pi/agent/extensions/provider-stats.json`，按需关闭某个 provider、隐藏订阅重置时间或指定余额币种：
@@ -288,6 +290,7 @@ maxTurns: 30
 {
   "providers": {
     "openai-codex": { "showResetTime": false },
+    "opencode-go": { "showMonthly": false },
     "deepseek": { "enabled": true, "currency": "CNY" }
   }
 }

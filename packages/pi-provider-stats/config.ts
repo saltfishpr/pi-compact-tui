@@ -10,6 +10,7 @@ export const providerConfigSchema = z.object({
   enabled: z.boolean().default(true),
   currency: z.enum(["CNY", "USD"]).optional(),
   showResetTime: z.boolean().default(true),
+  showMonthly: z.boolean().default(false),
 });
 
 export type ProviderConfig = z.infer<typeof providerConfigSchema>;

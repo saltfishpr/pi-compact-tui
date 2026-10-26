@@ -1,7 +1,8 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 
 export interface SubscriptionWindow {
-  windowSeconds: number;
+  /** Display label, e.g. "5h", "7d", or "1mo". */
+  label: string;
   usedPercent?: number;
   resetAtMs?: number;
 }
@@ -28,14 +29,15 @@ export function formatSubscriptionStatus(
   return usage.windows
     .map((window) => {
       const remainingPercent = window.usedPercent === undefined ? "?" : (100 - window.usedPercent).toFixed(0);
-      const quota = `${formatWindow(window.windowSeconds)} ${remainingPercent}% left`;
+      const quota = `${window.label} ${remainingPercent}% left`;
       const coloredQuota = colorQuota(theme, quota, window.usedPercent);
       if (
         options.showResetTime === false ||
         window.resetAtMs === undefined ||
         window.usedPercent === undefined ||
         window.usedPercent <= 80
-      ) return coloredQuota;
+      )
+        return coloredQuota;
       return `${coloredQuota} ${theme.fg("dim", `🔄${formatRelativeTime(window.resetAtMs, options.now)}`)}`;
     })
     .join(theme.fg("dim", " • "));
@@ -45,12 +47,6 @@ function colorQuota(theme: Theme, text: string, usedPercent: number | undefined)
   if (usedPercent !== undefined && usedPercent > 90) return theme.fg("error", text);
   if (usedPercent !== undefined && usedPercent > 70) return theme.fg("warning", text);
   return theme.fg("success", text);
-}
-
-function formatWindow(seconds: number): string {
-  if (seconds % 86_400 === 0) return `${seconds / 86_400}d`;
-  if (seconds % 3_600 === 0) return `${seconds / 3_600}h`;
-  return `${Math.round(seconds / 60)}m`;
 }
 
 function formatRelativeTime(resetAt: number, now: number): string {
