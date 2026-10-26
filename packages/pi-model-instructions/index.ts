@@ -35,12 +35,7 @@ export default function (pi: ExtensionAPI) {
     const { model, match, content } = instructions;
     if (!model || !match || content === undefined) return;
 
-    const section = [
-      `Model: ${JSON.stringify(`${model.provider}/${model.id}`)}`,
-      `Instruction file: ${JSON.stringify(match.file)}`,
-      "",
-      content,
-    ].join("\n");
+    const section = [`Instruction file: ${JSON.stringify(match.file)}`, "", content].join("\n");
     const forcedPrompt = event.systemPromptOptions.forceSystemPrompt;
     event.systemPromptOptions.sections[SECTION_NAME] = section;
     lastInjection = { model, match };
