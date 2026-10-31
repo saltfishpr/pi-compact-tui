@@ -1,4 +1,5 @@
 import { getAgentDir, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { matchesKey } from "@earendil-works/pi-tui";
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import writeFileAtomic from "write-file-atomic";
@@ -72,6 +73,17 @@ export default function (pi: ExtensionAPI) {
   let sessionHistory: string[] = [];
   let cursor: number | null = null;
   let draft = "";
+  let unsubscribeTerminalInput: (() => void) | undefined;
+
+  function remember(text: string) {
+    if (!text || text.trim().length === 0) return;
+    const combined = view();
+    if (combined[combined.length - 1] !== text) {
+      sessionHistory.push(text);
+    }
+    cursor = null;
+    draft = "";
+  }
 
   function flushSessionHistory() {
     if (sessionHistory.length === 0) return;
@@ -140,23 +152,32 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("session_start", (_event, ctx) => {
+    if (ctx.mode === "tui") {
+      unsubscribeTerminalInput?.();
+      unsubscribeTerminalInput = ctx.ui.onTerminalInput((data) => {
+        if (!matchesKey(data, "ctrl+c")) return;
+        const text = ctx.ui.getEditorText();
+        if (!text || text.trim().length === 0) return;
+        // Input listeners run before the focused component, so wait one tick to
+        // confirm the editor actually cleared instead of a dialog consuming it.
+        queueMicrotask(() => {
+          if (ctx.ui.getEditorText().length > 0) return;
+          remember(text);
+        });
+      });
+    }
     if (!ctx.hasUI || !claimShortcutHint(shortcutHintFile)) return;
     ctx.ui.notify("历史输入快捷键：shift+↑ 上一条，shift+↓ 下一条", "info");
   });
 
   pi.on("input", (event) => {
     if (event.source !== "interactive") return;
-    const text = event.text;
-    if (!text || text.trim().length === 0) return;
-    const combined = view();
-    if (combined[combined.length - 1] !== text) {
-      sessionHistory.push(text);
-    }
-    cursor = null;
-    draft = "";
+    remember(event.text);
   });
 
   pi.on("session_shutdown", () => {
+    unsubscribeTerminalInput?.();
+    unsubscribeTerminalInput = undefined;
     flushSessionHistory();
     cursor = null;
     draft = "";

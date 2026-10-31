@@ -169,7 +169,7 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 
 ### 输入历史（`pi-history`）
 
-按 `Shift+↑` / `Shift+↓` 在输入框中翻阅历史输入，跨会话持久保存（保留最近 100 条）。
+按 `Shift+↑` / `Shift+↓` 在输入框中翻阅历史输入，跨会话持久保存（保留最近 100 条）。用 `Ctrl+C` 清空输入框时，草稿也会被保存，可随时召回。
 
 ### 模型专属指令（`pi-model-instructions`）
 

@@ -169,7 +169,7 @@ Arrays can also contain `{ "kind": "literal", "value": "|" }` for custom single-
 
 ### Input History (`pi-history`)
 
-Press `Shift+↑` / `Shift+↓` in the input box to browse previous input. The latest 100 entries are persisted across sessions.
+Press `Shift+↑` / `Shift+↓` in the input box to browse previous input. The latest 100 entries are persisted across sessions. Clearing the editor with `Ctrl+C` also saves the draft for later recall.
 
 ### Model Instructions (`pi-model-instructions`)
 
