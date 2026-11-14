@@ -1,11 +1,12 @@
-import type {
-  Api,
-  ClassifierApi,
-  ClassifierChoiceQuestion,
-  ClassifierModel,
-  Model,
-  ModelThinkingLevel,
-  ModelsSimpleStreamOptions,
+import {
+  uuidv7,
+  type Api,
+  type ClassifierApi,
+  type ClassifierChoiceQuestion,
+  type ClassifierModel,
+  type Model,
+  type ModelThinkingLevel,
+  type ModelsSimpleStreamOptions,
 } from "@earendil-works/pi-ai";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import * as z from "zod";
@@ -72,6 +73,8 @@ async function auditChatCommand(options: AuditCommandOptions & { model: Model<Ap
   try {
     const streamOptions: ModelsSimpleStreamOptions = {
       maxTokens: MAX_TOKENS,
+      // OpenCode 需要会话标识进行路由，每次审计使用独立 ID。
+      sessionId: uuidv7(),
       signal: controller.signal,
       onPayload(payload, requestModel) {
         if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
