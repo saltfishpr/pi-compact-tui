@@ -224,6 +224,8 @@ Provides Pi with an `agent` tool for delegating independent subtasks to subagent
 
 Subagent sessions are persisted per parent session and return a `Child session ID`, so the main model can pass `resume` to follow up or continue a task that hit `maxTurns`. Run `/subagents` (or `/subagents <childSessionId>`) in the TUI to browse subagents and inspect their full message and tool-call transcripts in real time or after completion.
 
+**Choose a model per call**: The main agent can use `models` to find the available chat models and their supported `thinkingLevels`. Filter by `query` or `provider`, or pass `limit` and `offset` to page through results. On a new or resumed `agent` call, pass `model` (`provider/model-id`) and/or `thinkingLevel` to override that call only. Omitted values fall back to the subagent's configuration, then the parent session; unavailable models or unsupported thinking levels passed explicitly are rejected.
+
 **Add a subagent**: Place a Markdown file in `~/.pi/agent/agents/` (global) or `.pi/agents/` (project). The filename becomes the subagent name:
 
 ```markdown
@@ -243,7 +245,7 @@ Write the subagent system prompt here...
 ```
 
 - `description` (required): Tells the main model when to use this subagent.
-- `model` / `effort` / `maxTurns`: Optional. They inherit the current session model when omitted; `maxTurns` defaults to 50.
+- `model` / `effort`: Optional defaults for the model and thinking level. Omitted values inherit from the parent session. `maxTurns` defaults to 50.
 - `tools`: Optional list of built-in tools to enable. Omit it to enable all Pi built-in tools available on the current platform, as `worker` does. Extension tools still require `extensions`.
 - `extensions`: Optional allowlist of extensions to enable for this subagent (e.g., `mcp`, `pi-web-search`, or an extension path). Disabled by default; `pi-subagent` itself is always excluded to prevent recursion.
 - `!command`: Optional shell command at the start of a line (outside code blocks). It runs in the current project directory before the subagent starts; its output is supplied to the subagent.

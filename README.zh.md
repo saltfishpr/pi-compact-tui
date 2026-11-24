@@ -224,6 +224,8 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 
 子会话按父会话持久化保存并返回 `Child session ID`，主模型可通过 `resume` 参数继续追问或接续因 `maxTurns` 截断的任务。在 TUI 中运行 `/subagents`（或 `/subagents <childSessionId>`）可查看运行中及已完成子代理的完整消息与工具调用轨迹。
 
+**按次选择模型**：主 agent 可以用 `models` 查询可用的聊天模型及其支持的 `thinkingLevels`，用 `query` 或 `provider` 筛选，或用 `limit` 和 `offset` 分页。新建或恢复子会话时，可在 `agent` 调用中传入 `model`（`provider/model-id`）和/或 `thinkingLevel`，仅对本次调用生效。省略的字段先用子代理配置，再继承父会话；显式指定的模型不可用或档位不受支持时，调用会报错。
+
 **添加子代理**：在 `~/.pi/agent/agents/`（全局）或 `.pi/agents/`（项目）下放置 Markdown 文件，文件名即子代理名：
 
 ```markdown
@@ -243,7 +245,7 @@ extensions:
 ```
 
 - `description`（必填）：告诉主模型何时使用该子代理。
-- `model` / `effort` / `maxTurns`：可选，不填时继承当前会话模型；`maxTurns` 默认 50。
+- `model` / `effort`：可选，分别设置默认模型和推理档位，省略时继承父会话。`maxTurns` 默认 50。
 - `tools`：可选，指定启用的内置工具。省略时启用当前平台可用的全部 Pi 内置工具，`worker` 使用这一默认行为。扩展工具仍需通过 `extensions` 启用。
 - `extensions`：可选，为该子代理按白名单开启扩展（如 `mcp`、`pi-web-search` 或扩展路径）。默认不加载任何扩展；`pi-subagent` 自身始终被排除以防止递归。
 - `!command`：可选，写在代码块外、行首的 shell 命令。子代理启动前在当前项目目录执行，输出会提供给子代理。

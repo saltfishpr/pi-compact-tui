@@ -1,4 +1,4 @@
-import { Type, type TextContent } from "@earendil-works/pi-ai";
+import { getSupportedThinkingLevels, StringEnum, Type, type TextContent } from "@earendil-works/pi-ai";
 import {
   DynamicBorder,
   getMarkdownTheme,
@@ -21,7 +21,7 @@ import {
   type TuiMouseEvent,
 } from "@earendil-works/pi-tui";
 
-import { resolveModel, type UsageTotals } from "../pi-common";
+import { resolveModel, THINKING_LEVELS, type UsageTotals } from "../pi-common";
 import { discoverAgents, type AgentDiagnostic, type AgentProfile } from "./agents";
 import { inChildSessionContext } from "./child-context";
 import { loadConfig, type SubagentConfig } from "./config";
@@ -29,6 +29,7 @@ import { formatDuration, formatUsage, shortenSessionId } from "./format";
 import { openSubagentsInspector } from "./inspector";
 import { logger } from "./logger";
 import { SubagentManager, type SpawnStopReason, type ToolTraceEntry } from "./manager";
+import { registerModelsTool } from "./models-tool";
 import { runProfileCommands } from "./profile-commands";
 import { ProfileTrust } from "./profile-trust";
 import { SubagentStore } from "./store";
@@ -91,6 +92,8 @@ export default function (pi: ExtensionAPI) {
   let manager: SubagentManager | undefined;
   const profileTrust = new ProfileTrust();
 
+  registerModelsTool(pi);
+
   pi.registerTool({
     name: "agent",
     label: "Agent",
@@ -98,20 +101,22 @@ export default function (pi: ExtensionAPI) {
     description: [
       "Delegate a focused task to a specialized subagent that runs in an isolated context.",
       "The subagent does not see this conversation, so include every piece of context it needs in `task`.",
-      "To continue a previous subagent session (for follow-up questions or resuming after max_turns), pass its `Child session ID` in `resume`.",
+      "To continue a previous subagent session (for follow-up questions or resuming after `max_turns`), pass its `Child session ID` in `resume`.",
     ].join("\n"),
     promptSnippet: "Delegate a focused task to a specialized subagent that runs in an isolated context",
     promptGuidelines: [
-      "Use agent to delegate self-contained tasks to a specialized subagent; the subagent does not see the current conversation, so put every needed detail into `task`.",
+      "Use `agent` to delegate self-contained tasks to a specialized subagent; the subagent does not see the current conversation, so put every needed detail into `task`.",
       "Choose a subagent only when its description matches the task. If none matches, handle the task yourself; do not substitute another role.",
       "To follow up with a previous subagent, ask clarifying questions, or continue a task that stopped at `max_turns`, pass its returned `Child session ID` in `resume` instead of starting from scratch.",
+      "Use the `models` tool to find available model IDs and thinking levels before overriding a subagent's model or thinking level.",
       "Do not spawn multiple `worker` subagents in parallel to edit overlapping files.",
     ],
     parameters: Type.Object({
       name: Type.Optional(
         Type.String({
           minLength: 1,
-          description: "Which subagent to run. Required when creating a new subagent; optional when `resume` is provided.",
+          description:
+            "Which subagent to run. Required when creating a new subagent; optional when `resume` is provided.",
         }),
       ),
       resume: Type.Optional(
@@ -129,7 +134,22 @@ export default function (pi: ExtensionAPI) {
           pattern: "^(?=.*\\S)[^\\r\\n]+$",
         }),
       ),
-      task: Type.String({ description: "The full task or follow-up instruction for the subagent, including all needed context" }),
+      model: Type.Optional(
+        Type.String({
+          pattern: "^[^/]+/.+$",
+          description:
+            "Model ID in `provider/model-id` format from the `models` tool. Overrides the model for this call only.",
+        }),
+      ),
+      thinkingLevel: Type.Optional(
+        StringEnum(THINKING_LEVELS, {
+          description:
+            "Thinking level supported by the selected model. Overrides the thinking level for this call only.",
+        }),
+      ),
+      task: Type.String({
+        description: "The full task or follow-up instruction for the subagent, including all needed context",
+      }),
     }),
     renderShell: "self",
 
@@ -143,8 +163,7 @@ export default function (pi: ExtensionAPI) {
 
       let profile: AgentProfile | undefined;
       let title: string;
-      let childSessionId: string;
-      let sessionManager: SessionManager;
+      let child: { childSessionId: string; sessionManager: SessionManager } | undefined;
 
       if (resumeId) {
         if (manager.isChildActive(resumeId)) {
@@ -166,8 +185,7 @@ export default function (pi: ExtensionAPI) {
         }
 
         title = params.title?.trim() || opened.record.title || profile.name;
-        childSessionId = resumeId;
-        sessionManager = opened.sessionManager;
+        child = { childSessionId: resumeId, sessionManager: opened.sessionManager };
       } else {
         if (!params.name?.trim()) {
           throw new Error("Parameter `name` is required when starting a new subagent");
@@ -182,21 +200,33 @@ export default function (pi: ExtensionAPI) {
         }
 
         title = params.title.trim();
-        const created = store.createSession(profile.name, title);
-        childSessionId = created.childSessionId;
-        sessionManager = created.sessionManager;
       }
 
+      if (
+        params.model &&
+        !ctx.modelRegistry.getAvailable().some((model) => `${model.provider}/${model.id}` === params.model)
+      ) {
+        throw new Error(`Model "${params.model}" is not available. Use the \`models\` tool to find available models.`);
+      }
       const resolved = resolveModel(ctx, {
-        model: profile.model,
-        thinkingLevel: profile.effort,
+        model: params.model ?? profile.model,
+        thinkingLevel: params.thinkingLevel ?? profile.effort,
         fallbackModel: ctx.model,
         fallbackThinkingLevel: ctx.thinkingLevel,
       });
       if (!resolved) {
         throw new Error(`No model available for subagent "${profile.name}"`);
       }
+      if (params.thinkingLevel !== undefined) {
+        const supported = getSupportedThinkingLevels(resolved.model);
+        if (!supported.includes(params.thinkingLevel)) {
+          throw new Error(
+            `Model "${resolved.model.provider}/${resolved.model.id}" does not support \`thinkingLevel\` "${params.thinkingLevel}". Supported: ${supported.join(", ")}.`,
+          );
+        }
+      }
 
+      const { childSessionId, sessionManager } = child ?? store.createSession(profile.name, title);
       const activeProfile = profile;
       const result = await manager.spawn(
         {
@@ -273,7 +303,10 @@ export default function (pi: ExtensionAPI) {
         .join("\n");
       // 展示层去掉末尾给 LLM 用的 Child session ID 提示行，避免与标题/底部重复
       const output = details?.childSessionId
-        ? rawOutput.replace(new RegExp(`\\n\\nChild session ID: ${details.childSessionId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`), "")
+        ? rawOutput.replace(
+            new RegExp(`\\n\\nChild session ID: ${details.childSessionId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`),
+            "",
+          )
         : rawOutput;
 
       if (expanded) {
@@ -469,12 +502,14 @@ export default function (pi: ExtensionAPI) {
     config = loadConfig();
 
     const activeTools = pi.getActiveTools();
+    const subagentTools = ["agent", "models"];
     if (!config.enabled) {
-      pi.setActiveTools(activeTools.filter((toolName) => toolName !== "agent"));
+      pi.setActiveTools(activeTools.filter((toolName) => !subagentTools.includes(toolName)));
       return;
     }
-    if (!activeTools.includes("agent")) {
-      pi.setActiveTools([...activeTools, "agent"]);
+    const missingTools = subagentTools.filter((toolName) => !activeTools.includes(toolName));
+    if (missingTools.length > 0) {
+      pi.setActiveTools([...activeTools, ...missingTools]);
     }
 
     const catalog = discoverAgents(ctx.cwd, ctx.isProjectTrusted());
