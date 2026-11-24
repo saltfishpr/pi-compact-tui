@@ -1,43 +1,8 @@
-import { homedir } from "node:os";
-
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { Component, TUI } from "@earendil-works/pi-tui";
 
-import { formatDuration, formatUsage } from "./format";
+import { formatDuration, formatToolCall, formatUsage } from "./format";
 import type { AgentThreadSnapshot, SubagentManager } from "./manager";
-
-function formatToolCall(theme: Theme, name: string, args: Record<string, unknown>): string {
-  const shortenPath = (p: string) => {
-    const home = homedir();
-    return p.startsWith(home) ? `~${p.slice(home.length)}` : p;
-  };
-
-  switch (name) {
-    case "bash": {
-      const command = (args.command as string) || "...";
-      const preview = command.length > 60 ? `${command.slice(0, 60)}...` : command;
-      return theme.fg("accent", "$ ") + theme.fg("toolOutput", preview);
-    }
-    case "read":
-    case "edit": {
-      const path = (args.file_path || args.path || "...") as string;
-      return theme.fg("accent", `${name} `) + theme.fg("muted", shortenPath(path));
-    }
-    case "write": {
-      const path = (args.file_path || args.path || "...") as string;
-      const content = (args.content || "") as string;
-      const lines = content.split("\n").length;
-      let text = theme.fg("accent", `${name} `) + theme.fg("muted", shortenPath(path));
-      if (lines > 1) text += theme.fg("muted", ` (${lines} lines)`);
-      return text;
-    }
-    default: {
-      const serialized = JSON.stringify(args);
-      const preview = serialized.length > 50 ? `${serialized.slice(0, 50)}...` : serialized;
-      return theme.fg("accent", name) + theme.fg("muted", ` ${preview}`);
-    }
-  }
-}
 
 class SubagentPanel implements Component {
   private readonly snapshots = new Map<string, AgentThreadSnapshot>();
@@ -51,9 +16,13 @@ class SubagentPanel implements Component {
     private readonly manager: SubagentManager,
   ) {
     this.unsubscribe = manager.subscribe((event) => {
-      if (event.type === "upsert") this.snapshots.set(event.snapshot.id, event.snapshot);
-      else if (event.type === "remove") this.snapshots.delete(event.id);
-      this.refresh();
+      if (event.type === "upsert") {
+        this.snapshots.set(event.snapshot.id, event.snapshot);
+        this.refresh();
+      } else if (event.type === "remove") {
+        this.snapshots.delete(event.id);
+        this.refresh();
+      }
     });
     this.timer = setInterval(() => this.refresh(), 1000);
   }
@@ -102,7 +71,9 @@ class SubagentPanel implements Component {
     const marker = running ? "●" : "◌";
     const elapsed = formatDuration(Date.now() - (thread.runningSince ?? thread.startedAt));
 
-    const details = [`"${thread.title}"`, `· ${elapsed}`];
+    const details = [`"${thread.title}"`];
+    if (thread.resumed) details.push("(resumed)");
+    details.push(`· ${elapsed}`);
     if (running) {
       details.push(`· ${thread.turns}t`);
       if (thread.model) details.push(`· ${thread.model}`);

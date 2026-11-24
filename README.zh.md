@@ -220,7 +220,9 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 
 ### Subagent（`pi-subagent`）
 
-为 Pi 提供 `agent` 工具，可把独立子任务委托给在隔离上下文中运行的子代理。内置 `explore`（探索）、`planner`（规划）和 `reviewer`（代码审查），你也可以添加自己的。
+为 Pi 提供 `agent` 工具，可把独立子任务委托给在隔离上下文中运行的子代理。内置 `explore`（探索）、`planner`（规划）、`reviewer`（代码审查）和 `worker`（通用编码，具备读写文件与执行 shell 命令能力），你也可以添加自己的。
+
+子会话按父会话持久化保存并返回 `Child session ID`，主模型可通过 `resume` 参数继续追问或接续因 `maxTurns` 截断的任务。在 TUI 中运行 `/subagents`（或 `/subagents <childSessionId>`）可查看运行中及已完成子代理的完整消息与工具调用轨迹。
 
 **添加子代理**：在 `~/.pi/agent/agents/`（全局）或 `.pi/agents/`（项目）下放置 Markdown 文件，文件名即子代理名：
 
@@ -230,6 +232,9 @@ description: 审查代码变更，输出问题清单
 model: anthropic/claude-sonnet-4-5
 effort: low
 maxTurns: 30
+extensions:
+  - pi-web-search
+  - mcp
 ---
 
 !git status --short
@@ -239,16 +244,18 @@ maxTurns: 30
 
 - `description`（必填）：告诉主模型何时使用该子代理。
 - `model` / `effort` / `maxTurns`：可选，不填时继承当前会话模型；`maxTurns` 默认 50。
+- `tools`：可选，指定启用的内置工具。省略时启用当前平台可用的全部 Pi 内置工具，`worker` 使用这一默认行为。扩展工具仍需通过 `extensions` 启用。
+- `extensions`：可选，为该子代理按白名单开启扩展（如 `mcp`、`pi-web-search` 或扩展路径）。默认不加载任何扩展；`pi-subagent` 自身始终被排除以防止递归。
 - `!command`：可选，写在代码块外、行首的 shell 命令。子代理启动前在当前项目目录执行，输出会提供给子代理。
 
-**配置**：编辑 `~/.pi/agent/extensions/subagent.json`，可关闭功能、限制并发数，或按子代理名覆盖其 `model` / `effort` / `maxTurns`：
+**配置**：编辑 `~/.pi/agent/extensions/subagent.json`，可关闭功能、限制并发数，或按子代理名覆盖其 `model` / `effort` / `maxTurns` / `extensions`：
 
 ```json
 {
   "enabled": true,
   "maxConcurrent": 4,
   "agents": {
-    "explore": { "effort": "low" }
+    "explore": { "effort": "low", "extensions": ["pi-web-search"] }
   }
 }
 ```

@@ -8,6 +8,7 @@ import {
   type ExtensionAPI,
   type ExtensionContext,
   type ModelRuntime,
+  type SessionManager,
 } from "@earendil-works/pi-coding-agent";
 import {
   Box,
@@ -24,11 +25,13 @@ import { resolveModel, type UsageTotals } from "../pi-common";
 import { discoverAgents, type AgentDiagnostic, type AgentProfile } from "./agents";
 import { inChildSessionContext } from "./child-context";
 import { loadConfig, type SubagentConfig } from "./config";
-import { formatDuration, formatUsage } from "./format";
+import { formatDuration, formatUsage, shortenSessionId } from "./format";
+import { openSubagentsInspector } from "./inspector";
 import { logger } from "./logger";
-import { SubagentManager, type SpawnStopReason } from "./manager";
+import { SubagentManager, type SpawnStopReason, type ToolTraceEntry } from "./manager";
 import { runProfileCommands } from "./profile-commands";
 import { ProfileTrust } from "./profile-trust";
+import { SubagentStore } from "./store";
 import { createSubagentWidget } from "./widget";
 
 const WIDGET_KEY = "pi-subagent";
@@ -60,11 +63,14 @@ function applyAgentOverrides(profiles: AgentProfile[], config: SubagentConfig): 
     if (override.model !== undefined) merged.model = override.model;
     if (override.effort !== undefined) merged.effort = override.effort;
     if (override.maxTurns !== undefined) merged.maxTurns = override.maxTurns;
+    if (override.extensions !== undefined) merged.extensions = override.extensions;
     return merged;
   });
 }
 
 interface AgentToolDetails {
+  childSessionId: string;
+  resumed?: boolean;
   name: string;
   title: string;
   model: string;
@@ -72,6 +78,8 @@ interface AgentToolDetails {
   durationMs: number;
   usage: UsageTotals;
   stopReason: SpawnStopReason;
+  toolTrace?: ToolTraceEntry[];
+  toolTraceTotal?: number;
 }
 
 export default function (pi: ExtensionAPI) {
@@ -79,6 +87,7 @@ export default function (pi: ExtensionAPI) {
 
   let config = loadConfig();
   let agents: AgentProfile[] = [];
+  let store: SubagentStore | undefined;
   let manager: SubagentManager | undefined;
   const profileTrust = new ProfileTrust();
 
@@ -89,35 +98,93 @@ export default function (pi: ExtensionAPI) {
     description: [
       "Delegate a focused task to a specialized subagent that runs in an isolated context.",
       "The subagent does not see this conversation, so include every piece of context it needs in `task`.",
+      "To continue a previous subagent session (for follow-up questions or resuming after max_turns), pass its `Child session ID` in `resume`.",
     ].join("\n"),
     promptSnippet: "Delegate a focused task to a specialized subagent that runs in an isolated context",
     promptGuidelines: [
       "Use agent to delegate self-contained tasks to a specialized subagent; the subagent does not see the current conversation, so put every needed detail into `task`.",
       "Choose a subagent only when its description matches the task. If none matches, handle the task yourself; do not substitute another role.",
+      "To follow up with a previous subagent, ask clarifying questions, or continue a task that stopped at `max_turns`, pass its returned `Child session ID` in `resume` instead of starting from scratch.",
+      "Do not spawn multiple `worker` subagents in parallel to edit overlapping files.",
     ],
     parameters: Type.Object({
-      name: Type.String({
-        minLength: 1,
-        description: `Which subagent to run.`,
-      }),
-      title: Type.String({
-        description: "A short title shown in the running subagent widget; it is not sent to the subagent",
-        minLength: 1,
-        maxLength: 60,
-        pattern: "^(?=.*\\S)[^\\r\\n]+$",
-      }),
-      task: Type.String({ description: "The full task for the subagent, including all needed context" }),
+      name: Type.Optional(
+        Type.String({
+          minLength: 1,
+          description: "Which subagent to run. Required when creating a new subagent; optional when `resume` is provided.",
+        }),
+      ),
+      resume: Type.Optional(
+        Type.String({
+          minLength: 1,
+          description: "Full child session ID returned by a previous `agent` call to continue that conversation.",
+        }),
+      ),
+      title: Type.Optional(
+        Type.String({
+          description:
+            "A short title shown in the running subagent widget; not sent to the subagent. Required for new subagents; optional on `resume`.",
+          minLength: 1,
+          maxLength: 60,
+          pattern: "^(?=.*\\S)[^\\r\\n]+$",
+        }),
+      ),
+      task: Type.String({ description: "The full task or follow-up instruction for the subagent, including all needed context" }),
     }),
     renderShell: "self",
 
     async execute(toolCallId, params, signal, _onUpdate, ctx): Promise<AgentToolResult<AgentToolDetails>> {
-      if (!manager) {
+      if (!manager || !store) {
         throw new Error("Agent manager not initialized");
       }
 
-      const profile = agents.find((agent) => agent.name === params.name);
-      if (!profile) {
-        throw new Error(`Unknown subagent "${params.name}"`);
+      const resumeId = params.resume?.trim();
+      const resumed = Boolean(resumeId);
+
+      let profile: AgentProfile | undefined;
+      let title: string;
+      let childSessionId: string;
+      let sessionManager: SessionManager;
+
+      if (resumeId) {
+        if (manager.isChildActive(resumeId)) {
+          throw new Error(
+            `Subagent session "${resumeId}" is already pending or running; concurrent resume is not allowed.`,
+          );
+        }
+
+        const opened = store.openSessionForResume(resumeId);
+        if (params.name && params.name !== opened.record.name) {
+          throw new Error(
+            `Cannot resume subagent "${resumeId}" (profile "${opened.record.name}") with different profile "${params.name}".`,
+          );
+        }
+
+        profile = agents.find((agent) => agent.name === opened.record.name);
+        if (!profile) {
+          throw new Error(`Unknown subagent "${opened.record.name}" for resumed session "${resumeId}"`);
+        }
+
+        title = params.title?.trim() || opened.record.title || profile.name;
+        childSessionId = resumeId;
+        sessionManager = opened.sessionManager;
+      } else {
+        if (!params.name?.trim()) {
+          throw new Error("Parameter `name` is required when starting a new subagent");
+        }
+        if (!params.title?.trim()) {
+          throw new Error("Parameter `title` is required when starting a new subagent");
+        }
+
+        profile = agents.find((agent) => agent.name === params.name);
+        if (!profile) {
+          throw new Error(`Unknown subagent "${params.name}"`);
+        }
+
+        title = params.title.trim();
+        const created = store.createSession(profile.name, title);
+        childSessionId = created.childSessionId;
+        sessionManager = created.sessionManager;
       }
 
       const resolved = resolveModel(ctx, {
@@ -130,38 +197,50 @@ export default function (pi: ExtensionAPI) {
         throw new Error(`No model available for subagent "${profile.name}"`);
       }
 
+      const activeProfile = profile;
       const result = await manager.spawn(
         {
           id: toolCallId,
-          profile,
-          title: params.title,
+          childSessionId,
+          sessionManager,
+          resumed,
+          profile: activeProfile,
+          title,
           task: params.task,
           model: resolved.model,
           thinkingLevel: resolved.thinkingLevel,
+          projectTrusted: ctx.isProjectTrusted(),
           prepare: async (prepareSignal) => {
-            await profileTrust.authorize(profile, ctx, prepareSignal);
-            if (profile.commands.length === 0) return "";
-            return runProfileCommands(profile.commands, ctx.cwd, prepareSignal);
+            if (resumed) return "";
+            await profileTrust.authorize(activeProfile, ctx, prepareSignal);
+            if (activeProfile.commands.length === 0) return "";
+            return runProfileCommands(activeProfile.commands, ctx.cwd, prepareSignal);
           },
         },
         signal,
       );
 
+      const contentText = `${result.text}\n\nChild session ID: ${result.childSessionId}`;
+
       return {
-        content: [{ type: "text", text: result.text }],
+        content: [{ type: "text", text: contentText }],
         details: {
-          name: profile.name,
-          title: params.title,
+          childSessionId: result.childSessionId,
+          resumed: result.resumed || undefined,
+          name: activeProfile.name,
+          title,
           model: result.model,
           turns: result.turns,
           durationMs: result.durationMs,
           usage: result.usage,
           stopReason: result.stopReason,
+          toolTrace: result.toolTrace,
+          toolTraceTotal: result.toolTraceTotal,
         },
       };
     },
 
-    renderCall(args, theme) {
+    renderCall(_args, _theme) {
       return new Container(); // call 过程中不渲染，展示在 widget 中
     },
 
@@ -177,19 +256,54 @@ export default function (pi: ExtensionAPI) {
       const box = new Box(1, 1, (text) => theme.bg(isError ? "toolErrorBg" : "toolSuccessBg", text));
       const content = new Container();
 
-      // 标题行：agent explore — 探索项目结构
+      // 标题行：agent explore [xxxx…yyyy] (resumed) — 探索项目结构
       const name = details?.name ? theme.fg("accent", details.name) : "";
+      const idBadge = details?.childSessionId
+        ? ` ${theme.fg("dim", `[${shortenSessionId(details.childSessionId)}]`)}`
+        : "";
+      const resumedBadge = details?.resumed ? ` ${theme.fg("muted", "(resumed)")}` : "";
       const title = details?.title ? ` — ${theme.fg("muted", details.title)}` : "";
-      content.addChild(new Text(`${theme.fg("toolTitle", theme.bold("agent"))} ${name}${title}`, 0, 0));
+      content.addChild(
+        new Text(`${theme.fg("toolTitle", theme.bold("agent"))} ${name}${idBadge}${resumedBadge}${title}`, 0, 0),
+      );
 
-      const output = result.content
+      const rawOutput = result.content
         .filter((part): part is TextContent => part.type === "text")
         .map((part) => part.text)
         .join("\n");
+      // 展示层去掉末尾给 LLM 用的 Child session ID 提示行，避免与标题/底部重复
+      const output = details?.childSessionId
+        ? rawOutput.replace(new RegExp(`\\n\\nChild session ID: ${details.childSessionId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`), "")
+        : rawOutput;
 
       if (expanded) {
         // 展开态：完整 markdown 渲染
         if (output) content.addChild(new Markdown(output, 0, 0, getMarkdownTheme()));
+
+        const trace = details?.toolTrace ?? [];
+        const totalTools = details?.toolTraceTotal ?? trace.length;
+        if (trace.length > 0) {
+          content.addChild(new Spacer(1));
+          content.addChild(new Text(theme.fg("muted", theme.bold(`Tools (${totalTools})`)), 0, 0));
+          const omitted = totalTools - trace.length;
+          const headCount = omitted > 0 ? Math.floor(trace.length / 2) : trace.length;
+
+          for (let i = 0; i < trace.length; i++) {
+            if (omitted > 0 && i === headCount) {
+              content.addChild(new Text(theme.fg("dim", `  … ${omitted} more tool calls omitted`), 0, 0));
+            }
+            const item = trace[i]!;
+            const icon = item.isError ? theme.fg("error", "✗") : theme.fg("success", "✓");
+            content.addChild(new Text(`  ${icon} ${theme.fg("muted", item.summary)}`, 0, 0));
+          }
+        }
+
+        if (details?.childSessionId) {
+          content.addChild(new Spacer(1));
+          content.addChild(
+            new Text(theme.fg("dim", `Run /subagents ${details.childSessionId} for full transcript`), 0, 0),
+          );
+        }
       } else if (output) {
         // 折叠态：前 5 行用普通文本，超出附展开提示
         const outputLines = output.split("\n");
@@ -203,7 +317,11 @@ export default function (pi: ExtensionAPI) {
       if (details) {
         content.addChild(new Spacer(1));
 
-        const parts = [formatDuration(details.durationMs ?? 0), `${details.turns ?? 0} turns`];
+        const parts: string[] = [];
+        const toolCount = details.toolTraceTotal ?? details.toolTrace?.length ?? 0;
+        if (toolCount > 0) parts.push(`${toolCount} tool${toolCount > 1 ? "s" : ""}`);
+        parts.push(formatDuration(details.durationMs ?? 0));
+        parts.push(`${details.turns ?? 0} turns`);
         if (details.model) parts.push(details.model);
         const usage = details.usage ? formatUsage(details.usage) : "";
         if (usage) parts.push(usage);
@@ -213,6 +331,18 @@ export default function (pi: ExtensionAPI) {
 
       box.addChild(content);
       return box;
+    },
+  });
+
+  pi.registerCommand("subagents", {
+    description: "Inspect subagent sessions and transcripts",
+    handler: async (args, ctx) => {
+      if (!store || !manager) {
+        ctx.ui.notify("Subagent manager is not initialized", "warning");
+        return;
+      }
+      const childSessionId = args.trim() || undefined;
+      await openSubagentsInspector(ctx, store, manager, childSessionId);
     },
   });
 
@@ -328,6 +458,14 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("session_start", (_event, ctx) => {
+    const previousManager = manager;
+    manager = undefined;
+    store = undefined;
+    ctx.ui.setWidget(WIDGET_KEY, undefined);
+    if (previousManager) {
+      void previousManager.shutdown();
+    }
+
     config = loadConfig();
 
     const activeTools = pi.getActiveTools();
@@ -344,7 +482,8 @@ export default function (pi: ExtensionAPI) {
     if (catalog.agents.length === 0) return;
     agents = applyAgentOverrides(catalog.agents, config);
 
-    manager = new SubagentManager(ctx.cwd, config.maxConcurrent, getModelRuntime(ctx));
+    store = new SubagentStore(ctx.cwd, ctx.sessionManager);
+    manager = new SubagentManager(ctx.cwd, config.maxConcurrent, getModelRuntime(ctx), { store });
     ctx.ui.setWidget(WIDGET_KEY, createSubagentWidget(manager), { placement: "aboveEditor" });
   });
 
@@ -360,5 +499,6 @@ export default function (pi: ExtensionAPI) {
     ctx.ui.setWidget(WIDGET_KEY, undefined);
     await manager?.shutdown();
     manager = undefined;
+    store = undefined;
   });
 }

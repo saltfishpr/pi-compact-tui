@@ -220,7 +220,9 @@ When a session is idle, automatically generates a short recap above the input bo
 
 ### Subagent (`pi-subagent`)
 
-Provides Pi with an `agent` tool for delegating independent subtasks to subagents running in isolated contexts. Three subagents are included: `explore`, `planner`, and `reviewer`; you can add your own as well.
+Provides Pi with an `agent` tool for delegating independent subtasks to subagents running in isolated contexts. Four subagents are included: `explore`, `planner`, `reviewer`, and `worker` (can edit/write files and run shell commands); you can add your own as well.
+
+Subagent sessions are persisted per parent session and return a `Child session ID`, so the main model can pass `resume` to follow up or continue a task that hit `maxTurns`. Run `/subagents` (or `/subagents <childSessionId>`) in the TUI to browse subagents and inspect their full message and tool-call transcripts in real time or after completion.
 
 **Add a subagent**: Place a Markdown file in `~/.pi/agent/agents/` (global) or `.pi/agents/` (project). The filename becomes the subagent name:
 
@@ -230,6 +232,9 @@ description: Review code changes and produce a list of issues
 model: anthropic/claude-sonnet-4-5
 effort: low
 maxTurns: 30
+extensions:
+  - pi-web-search
+  - mcp
 ---
 
 !git status --short
@@ -239,16 +244,18 @@ Write the subagent system prompt here...
 
 - `description` (required): Tells the main model when to use this subagent.
 - `model` / `effort` / `maxTurns`: Optional. They inherit the current session model when omitted; `maxTurns` defaults to 50.
+- `tools`: Optional list of built-in tools to enable. Omit it to enable all Pi built-in tools available on the current platform, as `worker` does. Extension tools still require `extensions`.
+- `extensions`: Optional allowlist of extensions to enable for this subagent (e.g., `mcp`, `pi-web-search`, or an extension path). Disabled by default; `pi-subagent` itself is always excluded to prevent recursion.
 - `!command`: Optional shell command at the start of a line (outside code blocks). It runs in the current project directory before the subagent starts; its output is supplied to the subagent.
 
-**Configuration**: Edit `~/.pi/agent/extensions/subagent.json` to disable the feature, limit concurrency, or override `model` / `effort` / `maxTurns` by subagent name:
+**Configuration**: Edit `~/.pi/agent/extensions/subagent.json` to disable the feature, limit concurrency, or override `model` / `effort` / `maxTurns` / `extensions` by subagent name:
 
 ```json
 {
   "enabled": true,
   "maxConcurrent": 4,
   "agents": {
-    "explore": { "effort": "low" }
+    "explore": { "effort": "low", "extensions": ["pi-web-search"] }
   }
 }
 ```

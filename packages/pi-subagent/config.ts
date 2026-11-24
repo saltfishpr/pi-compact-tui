@@ -12,6 +12,7 @@ export const agentOverrideSchema = z.object({
   model: modelSchema.shape.model,
   effort: z.enum(THINKING_LEVELS).optional(),
   maxTurns: z.number().int().positive().optional(),
+  extensions: z.array(z.string().min(1)).optional(),
 });
 
 export type AgentOverride = z.infer<typeof agentOverrideSchema>;
