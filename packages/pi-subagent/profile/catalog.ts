@@ -4,10 +4,11 @@ import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { basename, join, sep } from "node:path";
 import * as z from "zod";
 
-import { modelSchema, THINKING_LEVELS } from "../pi-common";
-import { ISOLATION_MODES } from "./worktree";
+import { modelSchema, THINKING_LEVELS } from "../../pi-common";
+import type { SubagentConfig } from "../config";
+import { ISOLATION_MODES, type AgentDiagnostic, type AgentProfile, type AgentSource } from "../types";
 
-const BUILTIN_AGENTS_DIR = join(import.meta.dirname, "agents");
+const BUILTIN_AGENTS_DIR = join(import.meta.dirname, "..", "agents");
 const GLOBAL_AGENTS_DIR = join(getAgentDir(), "agents");
 
 const frontmatterSchema = z.object({
@@ -20,31 +21,6 @@ const frontmatterSchema = z.object({
   maxTurns: z.number().int().positive().default(50),
   isolation: z.enum(ISOLATION_MODES).optional(),
 });
-
-type AgentFrontmatter = z.infer<typeof frontmatterSchema>;
-
-export type AgentSource = "builtin" | "global" | "project";
-
-export interface AgentProfile extends AgentFrontmatter {
-  name: string;
-  source: AgentSource;
-  body: string;
-  path: string;
-  sha256: string;
-  commands: string[];
-  /** 可由 subagent.json 的 agents.<name>.timeoutSeconds 配置 */
-  timeoutSeconds?: number;
-}
-
-export interface AgentDiagnostic {
-  path: string;
-  message: string;
-}
-
-export interface AgentCatalog {
-  agents: AgentProfile[];
-  diagnostics: AgentDiagnostic[];
-}
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -135,6 +111,11 @@ function loadAgentsFromDir(
   }
 }
 
+export interface AgentCatalog {
+  agents: AgentProfile[];
+  diagnostics: AgentDiagnostic[];
+}
+
 export function discoverAgents(cwd: string, includeProjectAgents: boolean): AgentCatalog {
   const agents = new Map<string, AgentProfile>();
   const diagnostics: AgentDiagnostic[] = [];
@@ -146,4 +127,19 @@ export function discoverAgents(cwd: string, includeProjectAgents: boolean): Agen
   }
 
   return { agents: [...agents.values()], diagnostics };
+}
+
+export function applyAgentOverrides(profiles: AgentProfile[], config: SubagentConfig): AgentProfile[] {
+  return profiles.map((profile) => {
+    const override = config.agents[profile.name];
+    if (!override) return profile;
+    const merged: AgentProfile = { ...profile };
+    if (override.model !== undefined) merged.model = override.model;
+    if (override.effort !== undefined) merged.effort = override.effort;
+    if (override.maxTurns !== undefined) merged.maxTurns = override.maxTurns;
+    if (override.timeoutSeconds !== undefined) merged.timeoutSeconds = override.timeoutSeconds;
+    if (override.isolation !== undefined) merged.isolation = override.isolation;
+    if (override.extensions !== undefined) merged.extensions = override.extensions;
+    return merged;
+  });
 }

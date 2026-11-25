@@ -16,9 +16,9 @@ import {
 import { homedir } from "node:os";
 import { basename, dirname, extname, isAbsolute, join, resolve, sep } from "node:path";
 
-import type { AgentProfile } from "./agents";
+import { logger } from "../logger";
+import type { AgentProfile } from "../types";
 import { runInChildSessionContext } from "./child-context";
-import { logger } from "./logger";
 
 const BUILTIN_TOOLS = [
   "read", "bash", "edit", "write", "grep", "find", "ls",
@@ -32,6 +32,7 @@ const BUILTIN_EXTENSION_FACTORIES: Record<string, () => ExtensionFactory> = {
 };
 
 const INDEX_FILE_BASENAMES = new Set(["index.ts", "index.js", "index.mts", "index.mjs", "index.cts", "index.cjs"]);
+const PACKAGE_ROOT_DIR = resolve(import.meta.dirname, "..");
 
 export interface ResolveWhitelistExtensionsOptions {
   cwd?: string;
@@ -78,7 +79,7 @@ function looksLikePathSpec(spec: string): boolean {
   );
 }
 
-export function isSelfSubagentExtension(extensionPath: string, selfDir: string = import.meta.dirname): boolean {
+export function isSelfSubagentExtension(extensionPath: string, selfDir: string = PACKAGE_ROOT_DIR): boolean {
   const normalizedTarget = resolve(extensionPath);
   const normalizedSelfDir = resolve(selfDir);
   if (normalizedTarget === normalizedSelfDir || normalizedTarget.startsWith(`${normalizedSelfDir}${sep}`)) {
@@ -94,7 +95,7 @@ export function resolveWhitelistExtensions(
 ): ResolvedWhitelistExtensions {
   const cwd = options.cwd ?? process.cwd();
   const homeDir = options.homeDir ?? homedir();
-  const selfDir = options.selfDir ?? import.meta.dirname;
+  const selfDir = options.selfDir ?? PACKAGE_ROOT_DIR;
 
   const builtinNames = new Set<string>();
   const extensionPaths = new Set<string>();

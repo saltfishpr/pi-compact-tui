@@ -1,18 +1,49 @@
 import { Type } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
-import { formatDuration, formatUsage } from "./format";
-import type { SubagentManager } from "./manager";
-import { formatActiveSnapshot, formatActivitySummary, formatSpawnResultText } from "./result-view";
-import { stopReasonToStatus, type SubagentStore } from "./store";
-import { formatWorktreeSummary } from "./worktree";
+import { extractTextContent, formatDuration, formatToolCallSummary, formatUsage } from "../format";
+import type { SubagentService } from "../runtime/service";
+import { stopReasonToStatus, type AgentThreadSnapshot, type SubagentActivity, type ToolTraceEntry } from "../types";
+import { formatSpawnResultText, formatWorktreeSummary } from "./result";
 
-export interface ControlToolsDeps {
-  getManager: () => SubagentManager | undefined;
-  getStore: () => SubagentStore | undefined;
+function formatActivitySummary(activity?: SubagentActivity): string | undefined {
+  if (!activity) return undefined;
+  if (activity.type === "toolCall") {
+    return formatToolCallSummary(activity.name, activity.args, 80);
+  }
+  const firstLine = activity.text.split("\n").find((line) => line.trim())?.trim() ?? "";
+  if (!firstLine) return undefined;
+  return firstLine.length > 80 ? `${firstLine.slice(0, 79)}…` : firstLine;
 }
 
-export function registerControlTools(pi: ExtensionAPI, deps: ControlToolsDeps): void {
+function formatActiveSnapshot(snapshot: AgentThreadSnapshot, recentTools: ToolTraceEntry[]): string {
+  const elapsed = formatDuration(Date.now() - (snapshot.runningSince ?? snapshot.startedAt));
+  const lines = [
+    `Subagent ${snapshot.name} [${snapshot.childSessionId}] (${snapshot.title})`,
+    `Status: ${snapshot.phase}${snapshot.background ? " (background)" : ""}`,
+    `Elapsed: ${elapsed} · Turns: ${snapshot.turns}${snapshot.model ? ` · Model: ${snapshot.model}` : ""}`,
+  ];
+  if (snapshot.worktreeBranch) lines.push(`Worktree branch: ${snapshot.worktreeBranch}`);
+  const activity = formatActivitySummary(snapshot.lastActivity);
+  if (activity) lines.push(`Last activity: ${activity}`);
+  if (recentTools.length > 0) {
+    lines.push("Recent tool calls:");
+    for (const tool of recentTools) {
+      lines.push(`- ${tool.isError ? "✗" : "✓"} ${tool.summary}`);
+    }
+  }
+  return lines.join("\n");
+}
+
+export function registerControlTools(pi: ExtensionAPI, getService: () => SubagentService | undefined): void {
+  const requireService = (): SubagentService => {
+    const service = getService();
+    if (!service) {
+      throw new Error("Agent manager not initialized");
+    }
+    return service;
+  };
+
   pi.registerTool({
     name: "agent_list",
     label: "List Subagents",
@@ -29,44 +60,29 @@ export function registerControlTools(pi: ExtensionAPI, deps: ControlToolsDeps): 
       ),
     }),
     async execute(_toolCallId, params) {
-      const manager = deps.getManager();
-      const store = deps.getStore();
-      if (!manager || !store) {
-        throw new Error("Agent manager not initialized");
-      }
-      const records = store
-        .list()
-        .filter((record) => !params.activeOnly || record.status === "pending" || record.status === "running");
+      const service = requireService();
+      const views = service.listViews({ activeOnly: Boolean(params.activeOnly) });
 
-      if (records.length === 0) {
+      if (views.length === 0) {
         return {
           content: [{ type: "text", text: params.activeOnly ? "No active subagents." : "No subagents in this session." }],
           details: {},
         };
       }
 
-      const lines = records.map((record) => {
-        const snapshot = manager.getSnapshot(record.childSessionId);
-        const status = snapshot ? snapshot.phase : record.status;
-        const background = snapshot?.background ?? record.background ?? false;
-        const turns = snapshot ? record.totalTurns + snapshot.turns : record.totalTurns;
-        const durationMs = snapshot
-          ? record.totalDurationMs + (Date.now() - (snapshot.runningSince ?? snapshot.startedAt))
-          : record.totalDurationMs;
-        const model = snapshot?.model || record.model || "-";
-        const activity = formatActivitySummary(snapshot?.lastActivity ?? record.lastActivity);
-        const worktreeBranch = snapshot?.worktreeBranch ?? record.worktree?.branch;
+      const lines = views.map((view) => {
+        const activity = formatActivitySummary(view.lastActivity);
         const parts = [
-          `- ${record.childSessionId}`,
-          `name=${record.name}`,
-          `title=${JSON.stringify(record.title)}`,
-          `status=${status}`,
-          `background=${background}`,
-          `turns=${turns}`,
-          `duration=${formatDuration(durationMs)}`,
-          `model=${model}`,
+          `- ${view.childSessionId}`,
+          `name=${view.name}`,
+          `title=${JSON.stringify(view.title)}`,
+          `status=${view.status}`,
+          `background=${view.background}`,
+          `turns=${view.turns}`,
+          `duration=${formatDuration(view.durationMs)}`,
+          `model=${view.model || "-"}`,
         ];
-        if (worktreeBranch) parts.push(`worktreeBranch=${worktreeBranch}`);
+        if (view.worktreeBranch) parts.push(`worktreeBranch=${view.worktreeBranch}`);
         if (activity) parts.push(`lastActivity=${JSON.stringify(activity)}`);
         return parts.join(" | ");
       });
@@ -102,25 +118,21 @@ export function registerControlTools(pi: ExtensionAPI, deps: ControlToolsDeps): 
       ),
     }),
     async execute(_toolCallId, params, signal) {
-      const manager = deps.getManager();
-      const store = deps.getStore();
-      if (!manager || !store) {
-        throw new Error("Agent manager not initialized");
-      }
+      const service = requireService();
       const id = params.childSessionId.trim();
       const block = Boolean(params.block);
 
-      if (manager.isChildActive(id)) {
+      if (service.isActive(id)) {
         if (!block) {
-          const snapshot = manager.getSnapshot(id)!;
-          const recentTools = manager.getRecentToolTrace(id, 5);
+          const snapshot = service.getSnapshot(id)!;
+          const recentTools = service.getRecentToolTrace(id, 5);
           return {
             content: [{ type: "text", text: formatActiveSnapshot(snapshot, recentTools) }],
             details: {},
           };
         }
 
-        const waited = await manager.wait(id, {
+        const waited = await service.wait(id, {
           waitSeconds: params.waitSeconds,
           signal,
           consume: true,
@@ -138,19 +150,21 @@ export function registerControlTools(pi: ExtensionAPI, deps: ControlToolsDeps): 
           };
         }
 
-        const snapshot = waited.snapshot ?? manager.getSnapshot(id);
+        const snapshot = waited.snapshot ?? service.getSnapshot(id);
         const reasonText =
           waited.reason === "timeout"
             ? `Wait timed out after ${params.waitSeconds}s; the subagent is still running in the background and will notify you when it finishes.`
             : "Wait cancelled; the subagent is still running in the background and will notify you when it finishes.";
-        const body = snapshot ? `${reasonText}\n\n${formatActiveSnapshot(snapshot, manager.getRecentToolTrace(id, 5))}` : reasonText;
+        const body = snapshot
+          ? `${reasonText}\n\n${formatActiveSnapshot(snapshot, service.getRecentToolTrace(id, 5))}`
+          : reasonText;
         return {
           content: [{ type: "text", text: body }],
           details: {},
         };
       }
 
-      const lastResult = manager.getLastResult(id, { consume: true });
+      const lastResult = service.getLastResult(id, { consume: true });
       if (lastResult) {
         const { text, isError } = formatSpawnResultText(lastResult);
         const usage = formatUsage(lastResult.usage);
@@ -170,33 +184,29 @@ export function registerControlTools(pi: ExtensionAPI, deps: ControlToolsDeps): 
         };
       }
 
-      const record = store.get(id);
-      if (!record) {
+      const view = service.getView(id);
+      if (!view) {
         throw new Error(`Unknown subagent session "${id}"`);
       }
 
-      const entries = store.loadTranscript(id);
+      const entries = service.loadTranscript(id);
       let lastText = "";
       for (let i = entries.length - 1; i >= 0; i--) {
         const entry = entries[i]!;
         if (entry.type === "message" && entry.message.role === "assistant") {
-          lastText = entry.message.content
-            .filter((part) => part.type === "text")
-            .map((part) => part.text)
-            .join("\n")
-            .trim();
+          lastText = extractTextContent(entry.message.content).trim();
           break;
         }
       }
 
       const lines = [
-        `Subagent ${record.name} [${record.childSessionId}] (${record.title})`,
-        `Status: ${record.status} · Turns: ${record.totalTurns} · Duration: ${formatDuration(record.totalDurationMs)}${record.model ? ` · Model: ${record.model}` : ""}`,
+        `Subagent ${view.name} [${view.childSessionId}] (${view.title})`,
+        `Status: ${view.status} · Turns: ${view.turns} · Duration: ${formatDuration(view.durationMs)}${view.model ? ` · Model: ${view.model}` : ""}`,
       ];
-      if (record.worktree) lines.push(`Worktree: ${record.worktree.branch} (${record.worktree.rootPath})`);
-      if (record.lastError) lines.push(`Error: ${record.lastError}`);
+      if (view.worktree) lines.push(`Worktree: ${view.worktree.branch} (${view.worktree.rootPath})`);
+      if (view.lastError) lines.push(`Error: ${view.lastError}`);
       if (lastText) lines.push("", lastText);
-      if (record.persisted) lines.push("", `Child session ID: ${record.childSessionId}`);
+      if (view.persisted) lines.push("", `Child session ID: ${view.childSessionId}`);
       return {
         content: [{ type: "text", text: lines.join("\n") }],
         details: {},
@@ -214,27 +224,23 @@ export function registerControlTools(pi: ExtensionAPI, deps: ControlToolsDeps): 
       childSessionId: Type.String({ minLength: 1, description: "Full child session ID to cancel." }),
     }),
     async execute(_toolCallId, params) {
-      const manager = deps.getManager();
-      const store = deps.getStore();
-      if (!manager || !store) {
-        throw new Error("Agent manager not initialized");
-      }
+      const service = requireService();
       const id = params.childSessionId.trim();
-      const wasActive = manager.isChildActive(id);
-      const recordBefore = store.get(id);
-      if (!wasActive && !recordBefore && !manager.getLastResult(id)) {
+      const wasActive = service.isActive(id);
+      const viewBefore = service.getView(id);
+      if (!wasActive && !viewBefore && !service.getLastResult(id)) {
         throw new Error(`Unknown subagent session "${id}"`);
       }
 
       if (!wasActive) {
-        const status = recordBefore?.status ?? "completed";
+        const status = viewBefore?.status ?? "completed";
         return {
           content: [{ type: "text", text: `Subagent "${id}" has already finished (status: ${status}).` }],
           details: {},
         };
       }
 
-      const result = await manager.cancel(id);
+      const result = await service.cancel(id);
       if (!result) {
         return {
           content: [{ type: "text", text: `Subagent "${id}" cancelled.` }],
@@ -272,18 +278,14 @@ export function registerControlTools(pi: ExtensionAPI, deps: ControlToolsDeps): 
       message: Type.String({ minLength: 1, description: "Non-empty steering instruction for the subagent." }),
     }),
     async execute(_toolCallId, params) {
-      const manager = deps.getManager();
-      const store = deps.getStore();
-      if (!manager || !store) {
-        throw new Error("Agent manager not initialized");
-      }
+      const service = requireService();
       const id = params.childSessionId.trim();
       const message = params.message.trim();
       if (!message) {
         throw new Error("Parameter `message` must not be empty");
       }
 
-      const outcome = await manager.steer(id, message);
+      const outcome = await service.steer(id, message);
       if (outcome.ok) {
         const note = outcome.queued
           ? `Steering message queued for subagent "${id}" and will be delivered once its session starts.`

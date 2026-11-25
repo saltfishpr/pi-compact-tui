@@ -1,7 +1,10 @@
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
+import writeFileAtomic from "write-file-atomic";
 import * as z from "zod";
 
 import { getGlobalConfigPath, loadJSONConfig, modelSchema, THINKING_LEVELS } from "../pi-common";
-import { ISOLATION_MODES } from "./worktree";
+import { ISOLATION_MODES } from "./types";
 
 const CONFIG_FILE_NAME = "subagent.json";
 
@@ -39,4 +42,11 @@ export type SubagentConfig = z.infer<typeof subagentConfigSchema>;
 
 export function loadConfig(): SubagentConfig {
   return loadJSONConfig(getSubagentConfigPath(), subagentConfigSchema);
+}
+
+export function saveConfig(config: SubagentConfig): void {
+  const path = getSubagentConfigPath();
+  const validated = subagentConfigSchema.parse(config);
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileAtomic.sync(path, `${JSON.stringify(validated, null, 2)}\n`);
 }

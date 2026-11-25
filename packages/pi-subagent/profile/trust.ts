@@ -1,10 +1,10 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { mkdirSync, readFileSync, realpathSync } from "node:fs";
-import { dirname } from "node:path";
-import writeFileAtomic from "write-file-atomic";
-import { selectScrollable } from "../pi-common";
-import { profileHash, type AgentProfile } from "./agents";
-import { getSubagentConfigPath, loadConfig, subagentConfigSchema, type SubagentConfig } from "./config";
+import { readFileSync, realpathSync } from "node:fs";
+
+import { selectScrollable } from "../../pi-common";
+import { loadConfig, saveConfig, type SubagentConfig } from "../config";
+import type { AgentProfile } from "../types";
+import { profileHash } from "./catalog";
 
 type TrustedProfile = SubagentConfig["trustedProfiles"][number];
 
@@ -78,7 +78,7 @@ export class ProfileTrust {
           const config = loadConfig();
           const entries = config.trustedProfiles.filter((entry) => entry.path !== profile.path);
           entries.push({ path: profile.path, sha256: profile.sha256 });
-          this.save({ ...config, trustedProfiles: entries });
+          saveConfig({ ...config, trustedProfiles: entries });
         }
       }
       signal.throwIfAborted();
@@ -101,15 +101,8 @@ export class ProfileTrust {
       for (const profile of profiles) {
         if (selectedPaths.has(profile.path)) entries.push({ path: profile.path, sha256: profile.sha256 });
       }
-      this.save({ ...config, trustedProfiles: entries });
+      saveConfig({ ...config, trustedProfiles: entries });
     });
-  }
-
-  private save(config: SubagentConfig): void {
-    const path = getSubagentConfigPath();
-    const validated = subagentConfigSchema.parse(config);
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileAtomic.sync(path, `${JSON.stringify(validated, null, 2)}\n`);
   }
 
   private async serialized<T>(operation: () => Promise<T> | T, signal?: AbortSignal): Promise<T> {

@@ -5,37 +5,14 @@ import { existsSync, mkdirSync, realpathSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 
+import type { SubagentWorktreeState, WorktreeSummary } from "../types";
+
 const execFileAsync = promisify(execFile);
 
 const GIT_MAX_BUFFER = 10 * 1024 * 1024;
 const MAX_COMMITS = 20;
 const MAX_DIFF_STAT_LINES = 40;
 const MAX_UNTRACKED_FILES = 30;
-
-export const ISOLATION_MODES = ["none", "worktree"] as const;
-
-export type IsolationMode = (typeof ISOLATION_MODES)[number];
-
-export interface SubagentWorktreeState {
-  repoRoot: string;
-  rootPath: string;
-  cwd: string;
-  branch: string;
-  baseCommit: string;
-}
-
-export interface WorktreeSummary {
-  rootPath: string;
-  cwd: string;
-  branch: string;
-  baseCommit: string;
-  cleanedUp: boolean;
-  hasChanges: boolean;
-  commitCount: number;
-  commits: string[];
-  diffStat: string;
-  untrackedFiles: string[];
-}
 
 export interface ValidatedGitRepo {
   repoRoot: string;
@@ -227,40 +204,4 @@ export async function finalizeWorktree(state: SubagentWorktreeState): Promise<Wo
     diffStat,
     untrackedFiles,
   };
-}
-
-export function formatWorktreeSummary(summary: WorktreeSummary): string {
-  if (summary.cleanedUp) {
-    return "Worktree cleaned up (no changes).";
-  }
-
-  const lines = [
-    "Worktree preserved (changes detected):",
-    `- Path: ${summary.rootPath}`,
-    `- Branch: ${summary.branch}`,
-  ];
-
-  if (summary.commitCount > 0) {
-    const suffix = summary.commitCount > summary.commits.length ? ` (showing ${summary.commits.length})` : "";
-    lines.push(`- Commits (${summary.commitCount})${suffix}:`);
-    for (const commit of summary.commits) {
-      lines.push(`  ${commit}`);
-    }
-  }
-
-  if (summary.diffStat) {
-    lines.push("- Diff stat:");
-    for (const line of summary.diffStat.split(/\r?\n/)) {
-      lines.push(`  ${line}`);
-    }
-  }
-
-  if (summary.untrackedFiles.length > 0) {
-    lines.push(`- Untracked files (${summary.untrackedFiles.length}):`);
-    for (const file of summary.untrackedFiles) {
-      lines.push(`  ${file}`);
-    }
-  }
-
-  return lines.join("\n");
 }

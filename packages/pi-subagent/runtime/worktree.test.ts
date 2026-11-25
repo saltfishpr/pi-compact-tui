@@ -6,19 +6,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-vi.mock("./logger", () => ({
+vi.mock("../logger", () => ({
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-import type { AgentProfile } from "./agents";
+import { formatWorktreeSummary } from "../tools/result";
+import type { AgentProfile } from "../types";
 import { SubagentManager } from "./manager";
 import { SubagentStore } from "./store";
-import {
-  finalizeWorktree,
-  formatWorktreeSummary,
-  prepareWorktree,
-  validateGitRepoForWorktree,
-} from "./worktree";
+import { finalizeWorktree, prepareWorktree, validateGitRepoForWorktree } from "./worktree";
 
 const tempDirs: string[] = [];
 let prevGitConfigGlobal: string | undefined;

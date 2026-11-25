@@ -9,39 +9,22 @@ import {
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { addUsageToTotals, createUsageTotals, type UsageTotals } from "../pi-common";
-import { logger } from "./logger";
-import type { SubagentWorktreeState } from "./worktree";
+import { addUsageToTotals, createUsageTotals, type UsageTotals } from "../../pi-common";
+import { logger } from "../logger";
+import {
+  addUsageTotals,
+  cloneUsage,
+  isActiveStatus,
+  stopReasonToStatus,
+  type AgentToolDetails,
+  type SpawnStopReason,
+  type SubagentActivity,
+  type SubagentStatus,
+  type SubagentWorktreeState,
+} from "../types";
 
 export const SUBAGENT_META_ENTRY_TYPE = "pi-subagent:meta";
 export const SUBAGENT_RUN_ENTRY_TYPE = "pi-subagent:run";
-
-export type SpawnStopReason = "stop" | "aborted" | "max_turns" | "timeout" | "error";
-
-export type SubagentStatus = "pending" | "running" | "completed" | "max_turns" | "timeout" | "aborted" | "error";
-
-export function stopReasonToStatus(stopReason: SpawnStopReason): SubagentStatus {
-  return stopReason === "stop" ? "completed" : stopReason;
-}
-
-export type SubagentActivity =
-  | { type: "text"; text: string }
-  | { type: "toolCall"; name: string; args: Record<string, unknown> };
-
-export interface SubagentMetaEntryData {
-  name: string;
-  title: string;
-}
-
-/** 每次运行收尾时写入子会话 JSONL；重启后以它为准，不依赖父会话 toolResult。 */
-export interface SubagentRunEntryData {
-  title: string;
-  stopReason: SpawnStopReason;
-  durationMs: number;
-  model?: string;
-  errorMessage?: string;
-  worktree?: SubagentWorktreeState;
-}
 
 export interface SubagentRecord {
   childSessionId: string;
@@ -63,49 +46,43 @@ export interface SubagentRecord {
   lastError?: string;
 }
 
+export interface SubagentMetaEntryData {
+  name: string;
+  title: string;
+}
+
+/** 每次运行收尾时写入子会话 JSONL；重启后以它为准，不依赖父会话 toolResult。 */
+export interface SubagentRunEntryData {
+  title: string;
+  stopReason: SpawnStopReason;
+  durationMs: number;
+  model?: string;
+  errorMessage?: string;
+  worktree?: SubagentWorktreeState;
+}
+
+export interface FinalizeRunParams {
+  childSessionId: string;
+  sessionManager: SessionManager;
+  title: string;
+  background: boolean;
+  timeoutSeconds?: number;
+  stopReason: SpawnStopReason;
+  model?: string;
+  turns: number;
+  durationMs: number;
+  usage: UsageTotals;
+  lastActivity?: SubagentActivity;
+  errorMessage?: string;
+  worktree?: SubagentWorktreeState;
+  recordWorktree?: SubagentWorktreeState;
+  appendRunEntry: boolean;
+}
+
 export type ParentSessionHandle = Pick<
   SessionManager,
   "getSessionDir" | "getSessionId" | "getSessionFile" | "getEntries"
 >;
-
-interface RestoredToolDetails {
-  childSessionId?: string;
-  name?: string;
-  title?: string;
-  model?: string;
-  turns?: number;
-  durationMs?: number;
-  usage?: Partial<UsageTotals>;
-  stopReason?: string;
-}
-
-function cloneUsage(usage: UsageTotals): UsageTotals {
-  return {
-    input: usage.input,
-    output: usage.output,
-    cacheRead: usage.cacheRead,
-    cacheWrite: usage.cacheWrite,
-    cost: usage.cost,
-  };
-}
-
-export function addUsageTotals(target: UsageTotals, delta: Partial<UsageTotals>): void {
-  target.input += delta.input ?? 0;
-  target.output += delta.output ?? 0;
-  target.cacheRead += delta.cacheRead ?? 0;
-  target.cacheWrite += delta.cacheWrite ?? 0;
-  target.cost += delta.cost ?? 0;
-}
-
-export function diffUsageTotals(current: UsageTotals, baseline: UsageTotals): UsageTotals {
-  return {
-    input: Math.max(0, current.input - baseline.input),
-    output: Math.max(0, current.output - baseline.output),
-    cacheRead: Math.max(0, current.cacheRead - baseline.cacheRead),
-    cacheWrite: Math.max(0, current.cacheWrite - baseline.cacheWrite),
-    cost: Math.max(0, current.cost - baseline.cost),
-  };
-}
 
 function mapStopReasonToStatus(stopReason: string | undefined, isError: boolean): SubagentStatus {
   if (stopReason === "max_turns") return "max_turns";
@@ -260,10 +237,6 @@ function summarizeFileEntries(entries: readonly FileEntry[]): {
   };
 }
 
-function isActiveStatus(status: SubagentStatus): boolean {
-  return status === "pending" || status === "running";
-}
-
 export class SubagentStore {
   readonly isPersistent: boolean;
   readonly subagentDir?: string;
@@ -411,6 +384,41 @@ export class SubagentStore {
     return persisted;
   }
 
+  /** 更新终态记录并在已落盘时追加 pi-subagent:run 条目；落盘失败不抛错，返回是否已持久化。 */
+  finalizeRun(params: FinalizeRunParams): boolean {
+    this.update(params.childSessionId, (record) => {
+      record.status = stopReasonToStatus(params.stopReason);
+      record.title = params.title;
+      record.background = params.background;
+      record.timeoutSeconds = params.timeoutSeconds;
+      if (params.model) record.model = params.model;
+      record.totalTurns += params.turns;
+      record.totalDurationMs += params.durationMs;
+      addUsageTotals(record.totalUsage, params.usage);
+      record.lastActivity = params.lastActivity;
+      record.lastError = params.errorMessage;
+      if (params.recordWorktree) record.worktree = params.recordWorktree;
+    });
+
+    let persisted = false;
+    try {
+      persisted = this.syncPersistence(params.childSessionId, params.sessionManager);
+      if (persisted && params.appendRunEntry) {
+        params.sessionManager.appendCustomEntry(SUBAGENT_RUN_ENTRY_TYPE, {
+          title: params.title,
+          stopReason: params.stopReason,
+          durationMs: params.durationMs,
+          model: params.model || undefined,
+          errorMessage: params.errorMessage,
+          worktree: params.worktree,
+        } satisfies SubagentRunEntryData);
+      }
+    } catch {
+      persisted = false;
+    }
+    return persisted;
+  }
+
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => {
@@ -477,7 +485,7 @@ export class SubagentStore {
       }
     }
 
-    // 关联父会话历史中的 agent toolResult details，补齐累计 durationMs、最新 title 与 stopReason
+    // 关联父会话历史中的 agent toolResult details，补齐旧格式会话的累计 durationMs、最新 title 与 stopReason
     const parentAggregates = new Map<
       string,
       {
@@ -495,7 +503,7 @@ export class SubagentStore {
     for (const entry of parentSessionManager.getEntries()) {
       if (entry.type !== "message" || entry.message.role !== "toolResult") continue;
       if (entry.message.toolName !== "agent") continue;
-      const details = entry.message.details as RestoredToolDetails | undefined;
+      const details = entry.message.details as Partial<AgentToolDetails> | undefined;
       if (!details?.childSessionId) continue;
       if (!this.records.has(details.childSessionId) || authoritative.has(details.childSessionId)) continue;
 

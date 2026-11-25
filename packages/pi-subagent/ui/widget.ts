@@ -1,8 +1,10 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { Component, TUI } from "@earendil-works/pi-tui";
 
-import { formatDuration, formatToolCall, formatUsage } from "./format";
-import type { AgentThreadSnapshot, SubagentManager } from "./manager";
+import { formatDuration, formatUsage } from "../format";
+import type { SubagentManager } from "../runtime/manager";
+import type { AgentThreadSnapshot } from "../types";
+import { formatBadges, formatToolCall } from "./shared";
 
 class SubagentPanel implements Component {
   private readonly snapshots = new Map<string, AgentThreadSnapshot>();
@@ -13,7 +15,7 @@ class SubagentPanel implements Component {
   constructor(
     private readonly tui: TUI,
     private readonly theme: Theme,
-    private readonly manager: SubagentManager,
+    manager: SubagentManager,
   ) {
     this.unsubscribe = manager.subscribe((event) => {
       if (event.type === "upsert") {
@@ -80,9 +82,11 @@ class SubagentPanel implements Component {
       const usage = formatUsage(thread.usage);
       if (usage) details.push(`· ${usage}`);
     }
-    const bgBadge = thread.background ? ` ${this.theme.fg("accent", "[bg]")}` : "";
-    const wtBadge = thread.worktreeBranch ? ` ${this.theme.fg("muted", "[wt]")}` : "";
-    return `${this.theme.fg("accent", `${marker} ${thread.name}`)}${bgBadge}${wtBadge} ${this.theme.fg("muted", details.join(" "))}`;
+    const badges = formatBadges(this.theme, {
+      background: thread.background,
+      worktreeBranch: thread.worktreeBranch,
+    });
+    return `${this.theme.fg("accent", `${marker} ${thread.name}`)}${badges} ${this.theme.fg("muted", details.join(" "))}`;
   }
 
   private renderActivity(thread: AgentThreadSnapshot): string | undefined {

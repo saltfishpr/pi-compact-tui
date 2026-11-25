@@ -1,4 +1,3 @@
-import type { Theme } from "@earendil-works/pi-coding-agent";
 import { homedir } from "node:os";
 
 import type { UsageTotals } from "../pi-common";
@@ -39,74 +38,58 @@ export function shortenSessionId(id: string): string {
   return `${id.slice(0, 4)}…${id.slice(-6)}`;
 }
 
-function shortenPath(filePath: string): string {
+export function shortenPath(filePath: string): string {
   const home = homedir();
   return filePath.startsWith(home) ? `~${filePath.slice(home.length)}` : filePath;
 }
 
-function collapseWhitespace(text: string): string {
+export function collapseWhitespace(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
-function truncateText(text: string, maxLength: number): string {
+export function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
   return maxLength <= 1 ? "…" : `${text.slice(0, maxLength - 1)}…`;
 }
 
-export function formatToolCallSummary(name: string, args: Record<string, unknown>, maxLength = 100): string {
-  let raw: string;
-  switch (name) {
-    case "bash": {
-      const command = typeof args.command === "string" ? collapseWhitespace(args.command) : "...";
-      raw = `$ ${command}`;
-      break;
-    }
-    case "read":
-    case "edit": {
-      const filePath = (args.file_path || args.path || "...") as string;
-      raw = `${name} ${shortenPath(String(filePath))}`;
-      break;
-    }
-    case "write": {
-      const filePath = (args.file_path || args.path || "...") as string;
-      const content = typeof args.content === "string" ? args.content : "";
-      const lines = content ? content.split("\n").length : 0;
-      raw = `${name} ${shortenPath(String(filePath))}${lines > 1 ? ` (${lines} lines)` : ""}`;
-      break;
-    }
-    default: {
-      let serialized: string;
-      try {
-        serialized = JSON.stringify(args ?? {});
-      } catch {
-        serialized = "{}";
-      }
-      raw = `${name} ${collapseWhitespace(serialized)}`;
-      break;
-    }
-  }
-  return truncateText(raw, maxLength);
+export function extractTextContent(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .filter((part): part is { type: "text"; text: string } =>
+      Boolean(
+        part &&
+        typeof part === "object" &&
+        "type" in part &&
+        part.type === "text" &&
+        typeof (part as { text?: unknown }).text === "string",
+      ),
+    )
+    .map((part) => part.text)
+    .join("\n");
 }
 
-export function formatToolCall(theme: Theme, name: string, args: Record<string, unknown>): string {
+export type DescribedToolCall =
+  | { kind: "bash"; command: string }
+  | { kind: "file"; name: "read" | "edit" | "write"; path: string; lineCount?: number }
+  | { kind: "other"; name: string; argsText: string };
+
+export function describeToolCall(name: string, args: Record<string, unknown>): DescribedToolCall {
   switch (name) {
     case "bash": {
       const command = typeof args.command === "string" ? collapseWhitespace(args.command) : "...";
-      const preview = truncateText(command, 60);
-      return theme.fg("accent", "$ ") + theme.fg("toolOutput", preview);
+      return { kind: "bash", command };
     }
     case "read":
     case "edit": {
       const filePath = (args.file_path || args.path || "...") as string;
-      return theme.fg("accent", `${name} `) + theme.fg("muted", shortenPath(String(filePath)));
+      return { kind: "file", name, path: shortenPath(String(filePath)) };
     }
     case "write": {
       const filePath = (args.file_path || args.path || "...") as string;
       const content = typeof args.content === "string" ? args.content : "";
-      const lines = content ? content.split("\n").length : 0;
-      let text = theme.fg("accent", `${name} `) + theme.fg("muted", shortenPath(String(filePath)));
-      if (lines > 1) text += theme.fg("muted", ` (${lines} lines)`);
-      return text;
+      const lineCount = content ? content.split("\n").length : 0;
+      return { kind: "file", name: "write", path: shortenPath(String(filePath)), lineCount };
     }
     default: {
       let serialized: string;
@@ -115,8 +98,24 @@ export function formatToolCall(theme: Theme, name: string, args: Record<string, 
       } catch {
         serialized = "{}";
       }
-      const preview = truncateText(collapseWhitespace(serialized), 50);
-      return theme.fg("accent", name) + theme.fg("muted", ` ${preview}`);
+      return { kind: "other", name, argsText: collapseWhitespace(serialized) };
     }
   }
+}
+
+export function formatToolCallSummary(name: string, args: Record<string, unknown>, maxLength = 100): string {
+  const described = describeToolCall(name, args);
+  let raw: string;
+  switch (described.kind) {
+    case "bash":
+      raw = `$ ${described.command}`;
+      break;
+    case "file":
+      raw = `${described.name} ${described.path}${described.lineCount && described.lineCount > 1 ? ` (${described.lineCount} lines)` : ""}`;
+      break;
+    case "other":
+      raw = `${described.name} ${described.argsText}`;
+      break;
+  }
+  return truncateText(raw, maxLength);
 }

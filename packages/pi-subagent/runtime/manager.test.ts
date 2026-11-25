@@ -2,11 +2,11 @@ import type { Model } from "@earendil-works/pi-ai";
 import { SessionManager, type AgentSession, type AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("./logger", () => ({
+vi.mock("../logger", () => ({
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-import type { AgentProfile } from "./agents";
+import type { AgentProfile } from "../types";
 import type { CreateChildSessionOptions } from "./child-session";
 import { MAX_TOOL_TRACE_ENTRIES, SubagentManager, trimToolTrace, type SpawnRequest } from "./manager";
 import { SubagentStore } from "./store";

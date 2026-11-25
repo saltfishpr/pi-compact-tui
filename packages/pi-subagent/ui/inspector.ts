@@ -3,44 +3,23 @@ import {
   rawKeyHint,
   type ExtensionContext,
   type KeybindingsManager,
-  type SessionEntry,
   type Theme,
 } from "@earendil-works/pi-coding-agent";
 import {
-  Container,
   Key,
   matchesKey,
   truncateToWidth,
-  wrapTextWithAnsi,
   type Component,
   type TUI,
   type TuiMouseEvent,
   type TuiMouseEventResult,
 } from "@earendil-works/pi-tui";
 
-import { formatDuration, formatToolCall, formatUsage, shortenSessionId } from "./format";
-import type { SubagentManager } from "./manager";
-import type { SubagentRecord, SubagentStatus, SubagentStore } from "./store";
-
-const COLLAPSED_TOOL_RESULT_LINES = 6;
-
-function statusIcon(theme: Theme, status: SubagentStatus): string {
-  switch (status) {
-    case "running":
-      return theme.fg("accent", "●");
-    case "pending":
-      return theme.fg("muted", "◌");
-    case "completed":
-      return theme.fg("success", "✓");
-    case "max_turns":
-      return theme.fg("warning", "⚠");
-    case "timeout":
-      return theme.fg("warning", "⏱");
-    case "aborted":
-    case "error":
-      return theme.fg("error", "✗");
-  }
-}
+import { formatDuration, formatUsage, shortenSessionId } from "../format";
+import type { SubagentService } from "../runtime/service";
+import type { SubagentView } from "../types";
+import { formatBadges, statusIcon } from "./shared";
+import { buildTranscriptLines } from "./transcript";
 
 function getWheelDirection(keyData: string): number | undefined {
   const wheel = /^\x1b\[<(\d+);\d+;\d+[Mm]$/.exec(keyData);
@@ -48,132 +27,6 @@ function getWheelDirection(keyData: string): number | undefined {
   const button = Number.parseInt(wheel[1]!, 10);
   if ((button & 64) === 0) return undefined;
   return (button & 3) === 0 ? -1 : 1;
-}
-
-function extractTextFromContent(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
-  return content
-    .filter((part): part is { type: "text"; text: string } => Boolean(part && part.type === "text" && typeof part.text === "string"))
-    .map((part) => part.text)
-    .join("\n");
-}
-
-function wrapBlock(text: string, width: number, indent = "  "): string[] {
-  const effectiveWidth = Math.max(10, width - indent.length);
-  const out: string[] = [];
-  for (const rawLine of text.split("\n")) {
-    const wrapped = wrapTextWithAnsi(rawLine, effectiveWidth);
-    if (wrapped.length === 0) {
-      out.push(indent);
-    } else {
-      for (const line of wrapped) out.push(`${indent}${line}`);
-    }
-  }
-  return out;
-}
-
-export interface TranscriptRenderOptions {
-  showThinking: boolean;
-  expandTools: boolean;
-}
-
-export function buildTranscriptLines(
-  entries: readonly SessionEntry[],
-  theme: Theme,
-  width: number,
-  options: TranscriptRenderOptions,
-): string[] {
-  const lines: string[] = [];
-  const toolCallsById = new Map<string, { name: string; args: Record<string, unknown> }>();
-  let userTurn = 0;
-
-  for (const entry of entries) {
-    if (entry.type === "compaction") {
-      lines.push(theme.fg("muted", "── [compaction summary] ──"));
-      lines.push(...wrapBlock(theme.fg("dim", entry.summary), width));
-      lines.push("");
-      continue;
-    }
-
-    if (entry.type !== "message") continue;
-    const msg = entry.message;
-
-    if (msg.role === "user") {
-      userTurn++;
-      const label = userTurn === 1 ? "User (#1)" : `User (#${userTurn} · resume)`;
-      lines.push(theme.fg("accent", theme.bold(`━━ ${label} ━━`)));
-      const text = extractTextFromContent(msg.content).trim();
-      lines.push(...wrapBlock(theme.fg("text", text || "(empty)"), width));
-      lines.push("");
-      continue;
-    }
-
-    if (msg.role === "assistant") {
-      lines.push(theme.fg("toolTitle", theme.bold("Assistant")));
-      const parts = Array.isArray(msg.content) ? msg.content : [];
-      let hasRenderedPart = false;
-
-      for (const part of parts) {
-        if (part.type === "thinking") {
-          if (options.showThinking && part.thinking?.trim()) {
-            hasRenderedPart = true;
-            lines.push(theme.fg("dim", "  [thinking]"));
-            lines.push(...wrapBlock(theme.fg("dim", part.thinking.trim()), width, "    "));
-          }
-        } else if (part.type === "text") {
-          if (part.text.trim()) {
-            hasRenderedPart = true;
-            lines.push(...wrapBlock(theme.fg("text", part.text.trim()), width));
-          }
-        } else if (part.type === "toolCall") {
-          hasRenderedPart = true;
-          const args = (part.arguments ?? {}) as Record<string, unknown>;
-          toolCallsById.set(part.id, { name: part.name, args });
-          lines.push(`  ${theme.fg("muted", "→ ")}${formatToolCall(theme, part.name, args)}`);
-        }
-      }
-
-      if (msg.stopReason === "error" && msg.errorMessage) {
-        hasRenderedPart = true;
-        lines.push(...wrapBlock(theme.fg("error", `Error: ${msg.errorMessage}`), width));
-      } else if (!hasRenderedPart) {
-        lines.push(theme.fg("dim", "  (no text output)"));
-      }
-      lines.push("");
-      continue;
-    }
-
-    if (msg.role === "toolResult") {
-      const icon = msg.isError ? theme.fg("error", "✗") : theme.fg("success", "✓");
-      const matchedCall = toolCallsById.get(msg.toolCallId);
-      const header = matchedCall
-        ? `${icon} ${formatToolCall(theme, matchedCall.name, matchedCall.args)}`
-        : `${icon} ${theme.fg("accent", msg.toolName)}`;
-      lines.push(`  ${header}`);
-
-      const output = extractTextFromContent(msg.content).trimEnd();
-      if (output) {
-        const rawLines = output.split("\n");
-        const limit = options.expandTools ? rawLines.length : COLLAPSED_TOOL_RESULT_LINES;
-        const shown = rawLines.slice(0, limit).join("\n");
-        lines.push(...wrapBlock(theme.fg(msg.isError ? "error" : "toolOutput", shown), width, "    "));
-        if (!options.expandTools && rawLines.length > limit) {
-          lines.push(
-            theme.fg("dim", `    … (${rawLines.length - limit} more lines, press e to expand)`),
-          );
-        }
-      } else {
-        lines.push(theme.fg("dim", "    (empty output)"));
-      }
-      lines.push("");
-    }
-  }
-
-  if (lines.length === 0) {
-    return [theme.fg("muted", "  No messages recorded yet.")];
-  }
-  return lines;
 }
 
 class SubagentsInspectorComponent implements Component {
@@ -210,8 +63,7 @@ class SubagentsInspectorComponent implements Component {
     private readonly tui: TUI,
     private readonly theme: Theme,
     private readonly keybindings: KeybindingsManager,
-    private readonly store: SubagentStore,
-    private readonly manager: SubagentManager,
+    private readonly service: SubagentService,
     private readonly done: () => void,
     initialChildSessionId?: string,
   ) {
@@ -220,17 +72,17 @@ class SubagentsInspectorComponent implements Component {
     if (initialChildSessionId) {
       this.view = "detail";
       this.activeChildSessionId = initialChildSessionId;
-      this.followMode = manager.isChildActive(initialChildSessionId);
+      this.followMode = service.isActive(initialChildSessionId);
     } else {
       this.view = "list";
     }
 
-    this.unsubStore = store.subscribe(() => {
+    this.unsubStore = service.subscribeStore(() => {
       this.detailVersion++;
       this.refresh();
     });
 
-    this.unsubManager = manager.subscribe((event) => {
+    this.unsubManager = service.subscribeManager((event) => {
       if (
         event.type === "session_update" &&
         this.view === "detail" &&
@@ -266,16 +118,16 @@ class SubagentsInspectorComponent implements Component {
     this.tui.requestRender();
   }
 
-  private getFilteredRecords(): SubagentRecord[] {
-    const all = this.store.list();
+  private getFilteredViews(): SubagentView[] {
+    const all = this.service.listViews();
     const q = this.filterQuery.trim().toLowerCase();
     if (!q) return all;
     return all.filter(
-      (record) =>
-        record.name.toLowerCase().includes(q) ||
-        record.title.toLowerCase().includes(q) ||
-        record.childSessionId.toLowerCase().includes(q) ||
-        record.status.toLowerCase().includes(q),
+      (item) =>
+        item.name.toLowerCase().includes(q) ||
+        item.title.toLowerCase().includes(q) ||
+        item.childSessionId.toLowerCase().includes(q) ||
+        item.status.toLowerCase().includes(q),
     );
   }
 
@@ -287,9 +139,9 @@ class SubagentsInspectorComponent implements Component {
     if (this.view === "detail") {
       this.scrollDetailBy(delta);
     } else {
-      const records = this.getFilteredRecords();
-      if (records.length > 0) {
-        this.selectedIndex = Math.max(0, Math.min(records.length - 1, this.selectedIndex + Math.sign(delta)));
+      const items = this.getFilteredViews();
+      if (items.length > 0) {
+        this.selectedIndex = Math.max(0, Math.min(items.length - 1, this.selectedIndex + Math.sign(delta)));
         this.refresh();
       }
     }
@@ -302,9 +154,9 @@ class SubagentsInspectorComponent implements Component {
       if (this.view === "detail") {
         this.scrollDetailBy(wheelDir * 3);
       } else {
-        const records = this.getFilteredRecords();
-        if (records.length > 0) {
-          this.selectedIndex = Math.max(0, Math.min(records.length - 1, this.selectedIndex + wheelDir));
+        const items = this.getFilteredViews();
+        if (items.length > 0) {
+          this.selectedIndex = Math.max(0, Math.min(items.length - 1, this.selectedIndex + wheelDir));
           this.refresh();
         }
       }
@@ -319,7 +171,7 @@ class SubagentsInspectorComponent implements Component {
   }
 
   private handleListInput(data: string): void {
-    const records = this.getFilteredRecords();
+    const items = this.getFilteredViews();
 
     if (this.filtering) {
       if (this.keybindings.matches(data, "tui.select.cancel") || data === "\r" || data === "\n") {
@@ -361,11 +213,11 @@ class SubagentsInspectorComponent implements Component {
       return;
     }
 
-    if (records.length === 0) return;
+    if (items.length === 0) return;
 
     if (data === "x") {
-      const selected = records[this.selectedIndex];
-      if (selected && this.manager.isChildActive(selected.childSessionId)) {
+      const selected = items[this.selectedIndex];
+      if (selected && selected.isActive) {
         this.pendingCancel = {
           childSessionId: selected.childSessionId,
           title: selected.title || selected.name,
@@ -376,8 +228,8 @@ class SubagentsInspectorComponent implements Component {
     }
 
     if (data === "b") {
-      const selected = records[this.selectedIndex];
-      if (selected && this.manager.detach(selected.childSessionId)) {
+      const selected = items[this.selectedIndex];
+      if (selected && this.service.detach(selected.childSessionId)) {
         this.refresh();
       }
       return;
@@ -387,16 +239,16 @@ class SubagentsInspectorComponent implements Component {
       this.selectedIndex = Math.max(0, this.selectedIndex - 1);
       this.refresh();
     } else if (this.keybindings.matches(data, "tui.select.down") || data === "j") {
-      this.selectedIndex = Math.min(records.length - 1, this.selectedIndex + 1);
+      this.selectedIndex = Math.min(items.length - 1, this.selectedIndex + 1);
       this.refresh();
     } else if (data === "g") {
       this.selectedIndex = 0;
       this.refresh();
     } else if (data === "G") {
-      this.selectedIndex = records.length - 1;
+      this.selectedIndex = items.length - 1;
       this.refresh();
     } else if (this.keybindings.matches(data, "tui.select.confirm") || data === "\r" || data === "\n") {
-      const selected = records[this.selectedIndex];
+      const selected = items[this.selectedIndex];
       if (selected) {
         this.openDetail(selected.childSessionId);
       }
@@ -408,7 +260,7 @@ class SubagentsInspectorComponent implements Component {
     if (data === "x") {
       const targetId = this.pendingCancel.childSessionId;
       this.pendingCancel = undefined;
-      void this.manager.cancel(targetId, { notify: true });
+      void this.service.cancel(targetId, { notify: true });
     } else {
       this.pendingCancel = undefined;
     }
@@ -439,17 +291,17 @@ class SubagentsInspectorComponent implements Component {
       return;
     }
 
-    if (data === "x" && this.activeChildSessionId && this.manager.isChildActive(this.activeChildSessionId)) {
-      const record = this.store.get(this.activeChildSessionId);
+    if (data === "x" && this.activeChildSessionId && this.service.isActive(this.activeChildSessionId)) {
+      const item = this.service.getView(this.activeChildSessionId);
       this.pendingCancel = {
         childSessionId: this.activeChildSessionId,
-        title: record?.title || record?.name || this.activeChildSessionId,
+        title: item?.title || item?.name || this.activeChildSessionId,
       };
       this.refresh();
       return;
     }
 
-    if (data === "b" && this.activeChildSessionId && this.manager.detach(this.activeChildSessionId)) {
+    if (data === "b" && this.activeChildSessionId && this.service.detach(this.activeChildSessionId)) {
       this.refresh();
       return;
     }
@@ -466,7 +318,7 @@ class SubagentsInspectorComponent implements Component {
       return;
     }
 
-    if (data === "f" && this.activeChildSessionId && this.manager.isChildActive(this.activeChildSessionId)) {
+    if (data === "f" && this.activeChildSessionId && this.service.isActive(this.activeChildSessionId)) {
       this.followMode = !this.followMode;
       if (this.followMode) {
         this.detailScrollTop = Math.max(0, this.detailContentHeight - this.detailViewportHeight);
@@ -490,7 +342,7 @@ class SubagentsInspectorComponent implements Component {
       this.refresh();
     } else if (data === "G") {
       this.detailScrollTop = Math.max(0, this.detailContentHeight - this.detailViewportHeight);
-      if (this.activeChildSessionId && this.manager.isChildActive(this.activeChildSessionId)) {
+      if (this.activeChildSessionId && this.service.isActive(this.activeChildSessionId)) {
         this.followMode = true;
       }
       this.refresh();
@@ -502,7 +354,7 @@ class SubagentsInspectorComponent implements Component {
     const next = Math.max(0, Math.min(maxScrollTop, this.detailScrollTop + delta));
     if (delta < 0) {
       this.followMode = false;
-    } else if (next >= maxScrollTop && this.activeChildSessionId && this.manager.isChildActive(this.activeChildSessionId)) {
+    } else if (next >= maxScrollTop && this.activeChildSessionId && this.service.isActive(this.activeChildSessionId)) {
       this.followMode = true;
     }
     if (next !== this.detailScrollTop) {
@@ -515,7 +367,7 @@ class SubagentsInspectorComponent implements Component {
     this.activeChildSessionId = childSessionId;
     this.view = "detail";
     this.detailScrollTop = 0;
-    this.followMode = this.manager.isChildActive(childSessionId);
+    this.followMode = this.service.isActive(childSessionId);
     this.cachedDetail = undefined;
     this.refresh();
   }
@@ -526,18 +378,15 @@ class SubagentsInspectorComponent implements Component {
   }
 
   render(width: number): string[] {
-    if (this.view === "list") {
-      return this.renderList(width);
-    }
-    return this.renderDetail(width);
+    return this.view === "list" ? this.renderList(width) : this.renderDetail(width);
   }
 
   private renderList(width: number): string[] {
-    const records = this.getFilteredRecords();
+    const items = this.getFilteredViews();
     const lines: string[] = [];
     lines.push(...this.border.render(width));
 
-    const header = `${this.theme.fg("accent", this.theme.bold("Subagents"))} ${this.theme.fg("muted", `(${records.length})`)}`;
+    const header = `${this.theme.fg("accent", this.theme.bold("Subagents"))} ${this.theme.fg("muted", `(${items.length})`)}`;
     lines.push(truncateToWidth(` ${header}`, width));
 
     if (this.filtering || this.filterQuery) {
@@ -552,40 +401,40 @@ class SubagentsInspectorComponent implements Component {
     lines.push("");
 
     const maxVisible = Math.max(5, Math.min(14, this.tui.terminal.rows - 10));
-    if (records.length === 0) {
+    if (items.length === 0) {
       lines.push(this.theme.fg("muted", this.filterQuery ? "  No matching subagents." : "  No subagents recorded in this session."));
     } else {
-      this.selectedIndex = Math.max(0, Math.min(records.length - 1, this.selectedIndex));
+      this.selectedIndex = Math.max(0, Math.min(items.length - 1, this.selectedIndex));
       if (this.selectedIndex < this.listScrollTop) {
         this.listScrollTop = this.selectedIndex;
       } else if (this.selectedIndex >= this.listScrollTop + maxVisible) {
         this.listScrollTop = this.selectedIndex - maxVisible + 1;
       }
-      const slice = records.slice(this.listScrollTop, this.listScrollTop + maxVisible);
+      const slice = items.slice(this.listScrollTop, this.listScrollTop + maxVisible);
 
       for (let i = 0; i < slice.length; i++) {
-        const record = slice[i]!;
+        const item = slice[i]!;
         const isSelected = this.listScrollTop + i === this.selectedIndex;
         const prefix = isSelected ? this.theme.fg("accent", "→ ") : "  ";
-        const icon = statusIcon(this.theme, record.status);
-        const name = this.theme.fg(isSelected ? "accent" : "text", record.name);
-        const idText = this.theme.fg("dim", `[${shortenSessionId(record.childSessionId)}]`);
-        const snapshot = this.manager.getSnapshot(record.childSessionId);
-        const bgBadge = (snapshot?.background ?? record.background) ? ` ${this.theme.fg("accent", "[bg]")}` : "";
-        const wtBadge = (snapshot?.worktreeBranch ?? record.worktree?.branch) ? ` ${this.theme.fg("muted", "[wt]")}` : "";
-        const title = record.title ? this.theme.fg("text", ` ${record.title}`) : "";
-        const metaParts: string[] = [];
-        metaParts.push(`${record.totalTurns}t`);
-        if (record.totalDurationMs > 0) metaParts.push(formatDuration(record.totalDurationMs));
-        const usage = formatUsage(record.totalUsage);
+        const icon = statusIcon(this.theme, item.status);
+        const name = this.theme.fg(isSelected ? "accent" : "text", item.name);
+        const idText = this.theme.fg("dim", `[${shortenSessionId(item.childSessionId)}]`);
+        const badges = formatBadges(this.theme, {
+          background: item.background,
+          worktreeBranch: item.worktreeBranch,
+        });
+        const title = item.title ? this.theme.fg("text", ` ${item.title}`) : "";
+        const metaParts: string[] = [`${item.turns}t`];
+        if (item.durationMs > 0) metaParts.push(formatDuration(item.durationMs));
+        const usage = formatUsage(item.usage);
         if (usage) metaParts.push(usage);
         const meta = this.theme.fg("muted", ` · ${metaParts.join(" · ")}`);
 
-        lines.push(truncateToWidth(`${prefix}${icon} ${name} ${idText}${bgBadge}${wtBadge}${title}${meta}`, width));
+        lines.push(truncateToWidth(`${prefix}${icon} ${name} ${idText}${badges}${title}${meta}`, width));
       }
 
-      if (records.length > maxVisible) {
-        lines.push(this.theme.fg("dim", `  (${this.selectedIndex + 1}/${records.length})`));
+      if (items.length > maxVisible) {
+        lines.push(this.theme.fg("dim", `  (${this.selectedIndex + 1}/${items.length})`));
       }
     }
 
@@ -593,15 +442,14 @@ class SubagentsInspectorComponent implements Component {
     if (this.pendingCancel) {
       lines.push(this.renderPendingCancelLine(width));
     } else {
-      const selected = records[this.selectedIndex];
-      const selectedSnapshot = selected ? this.manager.getSnapshot(selected.childSessionId) : undefined;
+      const selected = items[this.selectedIndex];
       const hintParts = [
         rawKeyHint("↑↓/jk", "select"),
         rawKeyHint("Enter", "inspect"),
         rawKeyHint("/", "filter"),
       ];
-      if (selectedSnapshot) {
-        if (!selectedSnapshot.background) hintParts.push(rawKeyHint("b", "background"));
+      if (selected?.isActive) {
+        if (!selected.background) hintParts.push(rawKeyHint("b", "background"));
         hintParts.push(rawKeyHint("x", "cancel"));
       }
       hintParts.push(rawKeyHint("Esc/q", "close"));
@@ -626,7 +474,7 @@ class SubagentsInspectorComponent implements Component {
       return this.cachedDetail.lines;
     }
 
-    const entries = this.manager.getActiveBranch(childId) ?? this.store.loadTranscript(childId);
+    const entries = this.service.loadTranscript(childId);
     const rendered = buildTranscriptLines(entries, this.theme, width, {
       showThinking: this.showThinking,
       expandTools: this.expandTools,
@@ -645,33 +493,30 @@ class SubagentsInspectorComponent implements Component {
 
   private renderDetail(width: number): string[] {
     const childId = this.activeChildSessionId;
-    const record = childId ? this.store.get(childId) : undefined;
-    const snapshot = childId ? this.manager.getSnapshot(childId) : undefined;
-    const isActive = Boolean(snapshot);
+    const item = childId ? this.service.getView(childId) : undefined;
+    const isActive = Boolean(item?.isActive);
 
     const lines: string[] = [];
     lines.push(...this.border.render(width));
 
-    if (record) {
-      const icon = statusIcon(this.theme, record.status);
-      const isBackground = snapshot?.background ?? record.background;
-      const bgBadge = isBackground ? ` ${this.theme.fg("accent", "[bg]")}` : "";
-      const titleLine = ` ${icon} ${this.theme.fg("accent", this.theme.bold(record.name))}${bgBadge} ${this.theme.fg("muted", record.title || "(untitled)")}`;
+    if (item) {
+      const icon = statusIcon(this.theme, item.status);
+      const badges = formatBadges(this.theme, { background: item.background });
+      const titleLine = ` ${icon} ${this.theme.fg("accent", this.theme.bold(item.name))}${badges} ${this.theme.fg("muted", item.title || "(untitled)")}`;
       lines.push(truncateToWidth(titleLine, width));
 
-      const metaParts = [`ID: ${record.childSessionId}`, `${record.totalTurns} turns`];
-      if (record.totalDurationMs > 0) metaParts.push(formatDuration(record.totalDurationMs));
-      const timeoutSeconds = snapshot?.timeoutSeconds ?? record.timeoutSeconds;
-      if (timeoutSeconds !== undefined) metaParts.push(`timeout: ${formatDuration(timeoutSeconds * 1000)}`);
-      if (record.model) metaParts.push(record.model);
-      const usage = formatUsage(record.totalUsage);
+      const metaParts = [`ID: ${item.childSessionId}`, `${item.turns} turns`];
+      if (item.durationMs > 0) metaParts.push(formatDuration(item.durationMs));
+      if (item.timeoutSeconds !== undefined) metaParts.push(`timeout: ${formatDuration(item.timeoutSeconds * 1000)}`);
+      if (item.model) metaParts.push(item.model);
+      const usage = formatUsage(item.usage);
       if (usage) metaParts.push(usage);
       lines.push(truncateToWidth(` ${this.theme.fg("dim", metaParts.join(" · "))}`, width));
 
-      if (record.worktree) {
+      if (item.worktree) {
         lines.push(
           truncateToWidth(
-            ` ${this.theme.fg("dim", `Worktree: ${record.worktree.branch} (${record.worktree.rootPath})`)}`,
+            ` ${this.theme.fg("dim", `Worktree: ${item.worktree.branch} (${item.worktree.rootPath})`)}`,
             width,
           ),
         );
@@ -718,7 +563,7 @@ class SubagentsInspectorComponent implements Component {
       ];
       if (isActive) {
         hintParts.push(rawKeyHint("f", "follow"));
-        if (!snapshot?.background) hintParts.push(rawKeyHint("b", "background"));
+        if (!item?.background) hintParts.push(rawKeyHint("b", "background"));
         hintParts.push(rawKeyHint("x", "cancel"));
       }
       hintParts.push(rawKeyHint("Esc", "back"));
@@ -733,8 +578,7 @@ class SubagentsInspectorComponent implements Component {
 
 export async function openSubagentsInspector(
   ctx: ExtensionContext,
-  store: SubagentStore,
-  manager: SubagentManager,
+  service: SubagentService,
   initialChildSessionId?: string,
 ): Promise<void> {
   if (ctx.mode !== "tui") {
@@ -742,7 +586,7 @@ export async function openSubagentsInspector(
     return;
   }
 
-  if (initialChildSessionId && !store.get(initialChildSessionId)) {
+  if (initialChildSessionId && !service.getView(initialChildSessionId)) {
     ctx.ui.notify(`Subagent session "${initialChildSessionId}" not found in this session`, "warning");
     return;
   }
@@ -752,8 +596,7 @@ export async function openSubagentsInspector(
       tui,
       theme,
       keybindings,
-      store,
-      manager,
+      service,
       () => done(undefined),
       initialChildSessionId,
     );
