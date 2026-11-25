@@ -34,6 +34,8 @@ function statusIcon(theme: Theme, status: SubagentStatus): string {
       return theme.fg("success", "✓");
     case "max_turns":
       return theme.fg("warning", "⚠");
+    case "timeout":
+      return theme.fg("warning", "⏱");
     case "aborted":
     case "error":
       return theme.fg("error", "✗");
@@ -180,6 +182,7 @@ class SubagentsInspectorComponent implements Component {
   private listScrollTop = 0;
   private filterQuery = "";
   private filtering = false;
+  private pendingCancel?: { childSessionId: string; title: string };
 
   private activeChildSessionId?: string;
   private detailScrollTop = 0;
@@ -236,8 +239,13 @@ class SubagentsInspectorComponent implements Component {
         this.detailVersion++;
         this.refresh();
       } else if (event.type === "upsert" || event.type === "remove") {
-        if (this.view === "detail" && event.type === "remove" && event.childSessionId === this.activeChildSessionId) {
-          this.detailVersion++;
+        if (event.type === "remove") {
+          if (this.pendingCancel?.childSessionId === event.childSessionId) {
+            this.pendingCancel = undefined;
+          }
+          if (this.view === "detail" && event.childSessionId === this.activeChildSessionId) {
+            this.detailVersion++;
+          }
         }
         this.refresh();
       }
@@ -334,6 +342,18 @@ class SubagentsInspectorComponent implements Component {
       return;
     }
 
+    if (this.pendingCancel) {
+      if (data === "x") {
+        const targetId = this.pendingCancel.childSessionId;
+        this.pendingCancel = undefined;
+        void this.manager.cancel(targetId, { notify: true });
+      } else {
+        this.pendingCancel = undefined;
+      }
+      this.refresh();
+      return;
+    }
+
     if (data === "q" || this.keybindings.matches(data, "tui.select.cancel")) {
       if (this.filterQuery && data !== "q") {
         this.filterQuery = "";
@@ -352,6 +372,26 @@ class SubagentsInspectorComponent implements Component {
     }
 
     if (records.length === 0) return;
+
+    if (data === "x") {
+      const selected = records[this.selectedIndex];
+      if (selected && this.manager.isChildActive(selected.childSessionId)) {
+        this.pendingCancel = {
+          childSessionId: selected.childSessionId,
+          title: selected.title || selected.name,
+        };
+        this.refresh();
+      }
+      return;
+    }
+
+    if (data === "b") {
+      const selected = records[this.selectedIndex];
+      if (selected && this.manager.detach(selected.childSessionId)) {
+        this.refresh();
+      }
+      return;
+    }
 
     if (this.keybindings.matches(data, "tui.select.up") || data === "k") {
       this.selectedIndex = Math.max(0, this.selectedIndex - 1);
@@ -374,13 +414,41 @@ class SubagentsInspectorComponent implements Component {
   }
 
   private handleDetailInput(data: string): void {
+    if (this.pendingCancel) {
+      if (data === "x") {
+        const targetId = this.pendingCancel.childSessionId;
+        this.pendingCancel = undefined;
+        void this.manager.cancel(targetId, { notify: true });
+      } else {
+        this.pendingCancel = undefined;
+      }
+      this.refresh();
+      return;
+    }
+
     if (data === "q") {
       this.close();
       return;
     }
 
     if (this.keybindings.matches(data, "tui.select.cancel") || data === "\x7f" || data === "\b") {
+      this.pendingCancel = undefined;
       this.view = "list";
+      this.refresh();
+      return;
+    }
+
+    if (data === "x" && this.activeChildSessionId && this.manager.isChildActive(this.activeChildSessionId)) {
+      const record = this.store.get(this.activeChildSessionId);
+      this.pendingCancel = {
+        childSessionId: this.activeChildSessionId,
+        title: record?.title || record?.name || this.activeChildSessionId,
+      };
+      this.refresh();
+      return;
+    }
+
+    if (data === "b" && this.activeChildSessionId && this.manager.detach(this.activeChildSessionId)) {
       this.refresh();
       return;
     }
@@ -501,6 +569,9 @@ class SubagentsInspectorComponent implements Component {
         const icon = statusIcon(this.theme, record.status);
         const name = this.theme.fg(isSelected ? "accent" : "text", record.name);
         const idText = this.theme.fg("dim", `[${shortenSessionId(record.childSessionId)}]`);
+        const snapshot = this.manager.getSnapshot(record.childSessionId);
+        const bgBadge = (snapshot?.background ?? record.background) ? ` ${this.theme.fg("accent", "[bg]")}` : "";
+        const wtBadge = (snapshot?.worktreeBranch ?? record.worktree?.branch) ? ` ${this.theme.fg("muted", "[wt]")}` : "";
         const title = record.title ? this.theme.fg("text", ` ${record.title}`) : "";
         const metaParts: string[] = [];
         metaParts.push(`${record.totalTurns}t`);
@@ -509,7 +580,7 @@ class SubagentsInspectorComponent implements Component {
         if (usage) metaParts.push(usage);
         const meta = this.theme.fg("muted", ` · ${metaParts.join(" · ")}`);
 
-        lines.push(truncateToWidth(`${prefix}${icon} ${name} ${idText}${title}${meta}`, width));
+        lines.push(truncateToWidth(`${prefix}${icon} ${name} ${idText}${bgBadge}${wtBadge}${title}${meta}`, width));
       }
 
       if (records.length > maxVisible) {
@@ -518,13 +589,27 @@ class SubagentsInspectorComponent implements Component {
     }
 
     lines.push("");
-    const hints = [
-      rawKeyHint("↑↓/jk", "select"),
-      rawKeyHint("Enter", "inspect"),
-      rawKeyHint("/", "filter"),
-      rawKeyHint("Esc/q", "close"),
-    ].join("  ");
-    lines.push(truncateToWidth(` ${hints}`, width));
+    if (this.pendingCancel) {
+      const prompt = this.theme.fg(
+        "warning",
+        `Press x again to cancel "${this.pendingCancel.title}" (Esc to keep running)`,
+      );
+      lines.push(truncateToWidth(` ${prompt}`, width));
+    } else {
+      const selected = records[this.selectedIndex];
+      const selectedSnapshot = selected ? this.manager.getSnapshot(selected.childSessionId) : undefined;
+      const hintParts = [
+        rawKeyHint("↑↓/jk", "select"),
+        rawKeyHint("Enter", "inspect"),
+        rawKeyHint("/", "filter"),
+      ];
+      if (selectedSnapshot) {
+        if (!selectedSnapshot.background) hintParts.push(rawKeyHint("b", "background"));
+        hintParts.push(rawKeyHint("x", "cancel"));
+      }
+      hintParts.push(rawKeyHint("Esc/q", "close"));
+      lines.push(truncateToWidth(` ${hintParts.join("  ")}`, width));
+    }
     lines.push(...this.border.render(width));
     return lines;
   }
@@ -564,22 +649,36 @@ class SubagentsInspectorComponent implements Component {
   private renderDetail(width: number): string[] {
     const childId = this.activeChildSessionId;
     const record = childId ? this.store.get(childId) : undefined;
-    const isActive = childId ? this.manager.isChildActive(childId) : false;
+    const snapshot = childId ? this.manager.getSnapshot(childId) : undefined;
+    const isActive = Boolean(snapshot);
 
     const lines: string[] = [];
     lines.push(...this.border.render(width));
 
     if (record) {
       const icon = statusIcon(this.theme, record.status);
-      const titleLine = ` ${icon} ${this.theme.fg("accent", this.theme.bold(record.name))} ${this.theme.fg("muted", record.title || "(untitled)")}`;
+      const isBackground = snapshot?.background ?? record.background;
+      const bgBadge = isBackground ? ` ${this.theme.fg("accent", "[bg]")}` : "";
+      const titleLine = ` ${icon} ${this.theme.fg("accent", this.theme.bold(record.name))}${bgBadge} ${this.theme.fg("muted", record.title || "(untitled)")}`;
       lines.push(truncateToWidth(titleLine, width));
 
       const metaParts = [`ID: ${record.childSessionId}`, `${record.totalTurns} turns`];
       if (record.totalDurationMs > 0) metaParts.push(formatDuration(record.totalDurationMs));
+      const timeoutSeconds = snapshot?.timeoutSeconds ?? record.timeoutSeconds;
+      if (timeoutSeconds !== undefined) metaParts.push(`timeout: ${formatDuration(timeoutSeconds * 1000)}`);
       if (record.model) metaParts.push(record.model);
       const usage = formatUsage(record.totalUsage);
       if (usage) metaParts.push(usage);
       lines.push(truncateToWidth(` ${this.theme.fg("dim", metaParts.join(" · "))}`, width));
+
+      if (record.worktree) {
+        lines.push(
+          truncateToWidth(
+            ` ${this.theme.fg("dim", `Worktree: ${record.worktree.branch} (${record.worktree.rootPath})`)}`,
+            width,
+          ),
+        );
+      }
 
       const flags = [
         `tools: ${this.expandTools ? "expanded" : "collapsed"}`,
@@ -608,20 +707,32 @@ class SubagentsInspectorComponent implements Component {
     lines.push(...visible.map((line) => truncateToWidth(line, width)));
 
     lines.push("");
-    const scrollInfo =
-      maxScrollTop > 0
-        ? ` ${this.theme.fg("dim", `(${this.detailScrollTop + 1}-${Math.min(this.detailContentHeight, this.detailScrollTop + this.detailViewportHeight)}/${this.detailContentHeight})`)}`
-        : "";
-    const hintParts = [
-      rawKeyHint("↑↓/jk/PgUp/PgDn/gG", "scroll"),
-      rawKeyHint("e", "tools"),
-      rawKeyHint("t", "thinking"),
-    ];
-    if (isActive) hintParts.push(rawKeyHint("f", "follow"));
-    hintParts.push(rawKeyHint("Esc", "back"));
-    hintParts.push(rawKeyHint("q", "close"));
+    if (this.pendingCancel) {
+      const prompt = this.theme.fg(
+        "warning",
+        `Press x again to cancel "${this.pendingCancel.title}" (Esc to keep running)`,
+      );
+      lines.push(truncateToWidth(` ${prompt}`, width));
+    } else {
+      const scrollInfo =
+        maxScrollTop > 0
+          ? ` ${this.theme.fg("dim", `(${this.detailScrollTop + 1}-${Math.min(this.detailContentHeight, this.detailScrollTop + this.detailViewportHeight)}/${this.detailContentHeight})`)}`
+          : "";
+      const hintParts = [
+        rawKeyHint("↑↓/jk/PgUp/PgDn/gG", "scroll"),
+        rawKeyHint("e", "tools"),
+        rawKeyHint("t", "thinking"),
+      ];
+      if (isActive) {
+        hintParts.push(rawKeyHint("f", "follow"));
+        if (!snapshot?.background) hintParts.push(rawKeyHint("b", "background"));
+        hintParts.push(rawKeyHint("x", "cancel"));
+      }
+      hintParts.push(rawKeyHint("Esc", "back"));
+      hintParts.push(rawKeyHint("q", "close"));
 
-    lines.push(truncateToWidth(` ${hintParts.join("  ")}${scrollInfo}`, width));
+      lines.push(truncateToWidth(` ${hintParts.join("  ")}${scrollInfo}`, width));
+    }
     lines.push(...this.border.render(width));
     return lines;
   }

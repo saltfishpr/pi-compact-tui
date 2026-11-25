@@ -17,6 +17,7 @@ const frontmatterSchema = z.object({
   model: modelSchema.shape.model,
   effort: z.enum(THINKING_LEVELS).optional(),
   maxTurns: z.number().int().positive().default(50),
+  isolation: z.enum(["none", "worktree"]).optional(),
 });
 
 type AgentFrontmatter = z.infer<typeof frontmatterSchema>;
@@ -30,6 +31,8 @@ export interface AgentProfile extends AgentFrontmatter {
   path: string;
   sha256: string;
   commands: string[];
+  /** 可由 subagent.json 的 agents.<name>.timeoutSeconds 配置 */
+  timeoutSeconds?: number;
 }
 
 export interface AgentDiagnostic {

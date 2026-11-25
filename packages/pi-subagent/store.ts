@@ -11,10 +11,12 @@ import { join } from "node:path";
 
 import { addUsageToTotals, createUsageTotals, type UsageTotals } from "../pi-common";
 import { logger } from "./logger";
+import type { SubagentWorktreeState } from "./worktree";
 
 export const SUBAGENT_META_ENTRY_TYPE = "pi-subagent:meta";
+export const SUBAGENT_RUN_ENTRY_TYPE = "pi-subagent:run";
 
-export type SubagentStatus = "pending" | "running" | "completed" | "max_turns" | "aborted" | "error";
+export type SubagentStatus = "pending" | "running" | "completed" | "max_turns" | "timeout" | "aborted" | "error";
 
 export type SubagentActivity =
   | { type: "text"; text: string }
@@ -25,11 +27,24 @@ export interface SubagentMetaEntryData {
   title: string;
 }
 
+/** 每次运行收尾时写入子会话 JSONL；重启后以它为准，不依赖父会话 toolResult。 */
+export interface SubagentRunEntryData {
+  title: string;
+  stopReason: "stop" | "aborted" | "max_turns" | "timeout" | "error";
+  durationMs: number;
+  model?: string;
+  errorMessage?: string;
+  worktree?: SubagentWorktreeState;
+}
+
 export interface SubagentRecord {
   childSessionId: string;
   name: string;
   title: string;
   status: SubagentStatus;
+  background?: boolean;
+  timeoutSeconds?: number;
+  worktree?: SubagentWorktreeState;
   sessionFile?: string;
   persisted: boolean;
   model: string;
@@ -88,6 +103,7 @@ export function diffUsageTotals(current: UsageTotals, baseline: UsageTotals): Us
 
 function mapStopReasonToStatus(stopReason: string | undefined, isError: boolean): SubagentStatus {
   if (stopReason === "max_turns") return "max_turns";
+  if (stopReason === "timeout") return "timeout";
   if (stopReason === "aborted") return "aborted";
   if (isError) return "error";
   return "completed";
@@ -123,9 +139,51 @@ function extractMetaFromEntries(entries: readonly FileEntry[]): SubagentMetaEntr
   return undefined;
 }
 
+function parseWorktreeState(value: unknown): SubagentWorktreeState | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const candidate = value as Partial<SubagentWorktreeState>;
+  if (
+    typeof candidate.repoRoot !== "string" ||
+    typeof candidate.rootPath !== "string" ||
+    typeof candidate.cwd !== "string" ||
+    typeof candidate.branch !== "string" ||
+    typeof candidate.baseCommit !== "string"
+  ) {
+    return undefined;
+  }
+  return {
+    repoRoot: candidate.repoRoot,
+    rootPath: candidate.rootPath,
+    cwd: candidate.cwd,
+    branch: candidate.branch,
+    baseCommit: candidate.baseCommit,
+  };
+}
+
+function extractRunsFromEntries(entries: readonly FileEntry[]): SubagentRunEntryData[] {
+  const runs: SubagentRunEntryData[] = [];
+  for (const entry of entries) {
+    if (entry.type !== "custom") continue;
+    const custom = entry as CustomEntry<unknown>;
+    if (custom.customType !== SUBAGENT_RUN_ENTRY_TYPE || !custom.data || typeof custom.data !== "object") continue;
+    const data = custom.data as Partial<SubagentRunEntryData>;
+    if (typeof data.stopReason !== "string") continue;
+    runs.push({
+      title: typeof data.title === "string" ? data.title : "",
+      stopReason: data.stopReason,
+      durationMs: typeof data.durationMs === "number" ? data.durationMs : 0,
+      model: data.model,
+      errorMessage: data.errorMessage,
+      worktree: parseWorktreeState(data.worktree),
+    });
+  }
+  return runs;
+}
+
 function summarizeFileEntries(entries: readonly FileEntry[]): {
   header?: SessionHeader;
   meta?: SubagentMetaEntryData;
+  runs: SubagentRunEntryData[];
   model: string;
   turns: number;
   usage: UsageTotals;
@@ -185,6 +243,7 @@ function summarizeFileEntries(entries: readonly FileEntry[]): {
   return {
     header,
     meta,
+    runs: extractRunsFromEntries(entries),
     model,
     turns,
     usage,
@@ -362,6 +421,7 @@ export class SubagentStore {
       ...record,
       totalUsage: cloneUsage(record.totalUsage),
       lastActivity: record.lastActivity ? { ...record.lastActivity } : undefined,
+      worktree: record.worktree ? { ...record.worktree } : undefined,
     };
   }
 
@@ -378,6 +438,7 @@ export class SubagentStore {
       return;
     }
 
+    const authoritative = new Set<string>();
     for (const file of files) {
       const sessionFile = join(this.subagentDir, file);
       try {
@@ -387,20 +448,23 @@ export class SubagentStore {
         if (!summary.header?.id) continue;
 
         const childSessionId = summary.header.id;
+        const lastRun = summary.runs.at(-1);
+        if (lastRun) authoritative.add(childSessionId);
         this.records.set(childSessionId, {
           childSessionId,
           name: summary.meta?.name ?? "unknown",
-          title: summary.meta?.title ?? "",
-          status: summary.status,
+          title: lastRun?.title || summary.meta?.title || "",
+          status: lastRun ? mapStopReasonToStatus(lastRun.stopReason, lastRun.stopReason === "error") : summary.status,
+          worktree: lastRun?.worktree,
           sessionFile,
           persisted: true,
-          model: summary.model,
+          model: summary.model || lastRun?.model || "",
           totalTurns: summary.turns,
           totalUsage: summary.usage,
-          totalDurationMs: 0,
+          totalDurationMs: summary.runs.reduce((sum, run) => sum + run.durationMs, 0),
           createdAt: summary.createdAt,
           updatedAt: summary.updatedAt,
-          lastError: summary.lastError,
+          lastError: lastRun ? lastRun.errorMessage : summary.lastError,
         });
       } catch (error) {
         logger.warn("Failed to restore subagent session file", { sessionFile, error });
@@ -427,7 +491,7 @@ export class SubagentStore {
       if (entry.message.toolName !== "agent") continue;
       const details = entry.message.details as RestoredToolDetails | undefined;
       if (!details?.childSessionId) continue;
-      if (!this.records.has(details.childSessionId)) continue;
+      if (!this.records.has(details.childSessionId) || authoritative.has(details.childSessionId)) continue;
 
       const ts = parseTimestamp(entry.timestamp, 0);
       const existing = parentAggregates.get(details.childSessionId) ?? {

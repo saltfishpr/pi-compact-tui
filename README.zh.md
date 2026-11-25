@@ -222,9 +222,19 @@ pi install git:github.com/saltfishpr/pi-compact-tui
 
 为 Pi 提供 `agent` 工具，可把独立子任务委托给在隔离上下文中运行的子代理。内置 `explore`（探索）、`planner`（规划）、`reviewer`（代码审查）和 `worker`（通用编码，具备读写文件与执行 shell 命令能力），你也可以添加自己的。
 
-子会话按父会话持久化保存并返回 `Child session ID`，主模型可通过 `resume` 参数继续追问或接续因 `maxTurns` 截断的任务。在 TUI 中运行 `/subagents`（或 `/subagents <childSessionId>`）可查看运行中及已完成子代理的完整消息与工具调用轨迹。
+子会话按父会话持久化保存并返回 `Child session ID`，主模型可通过 `resume` 参数继续追问，或接续因 `maxTurns` 截断、超时或中途出错的任务。
 
-**按次选择模型**：主 agent 可以用 `models` 查询可用的聊天模型及其支持的 `thinkingLevels`，用 `query` 或 `provider` 筛选，或用 `limit` 和 `offset` 分页。新建或恢复子会话时，可在 `agent` 调用中传入 `model`（`provider/model-id`）和/或 `thinkingLevel`，仅对本次调用生效。省略的字段先用子代理配置，再继承父会话；显式指定的模型不可用或档位不受支持时，调用会报错。
+**后台运行与 `/subagents`**：调用时传入 `background: true` 可将子代理放到后台异步执行，完成后自动推送结果通知；主代理也可以按需查看状态/输出、取消任务或中途纠偏。在 TUI 中运行 `/subagents`（或 `/subagents <childSessionId>`）可查看运行中及已完成子代理的完整消息与工具调用轨迹；对运行中的任务，按 `b` 可将前台任务移到后台，连续按两次 `x` 可取消单个活跃任务。
+
+**Git worktree 隔离**：可在调用参数、子代理配置或 `subagent.json` 中设置 `isolation: "worktree"`，为子代理在 `~/.pi/agent/worktrees/` 下创建独立的 Git worktree 与分支，适合多个 `worker` 并行修改代码。启用时要求当前目录位于已有 commit 的 Git 仓库中。任务结束后，无改动会自动清理 worktree 和分支；有改动则保留并在结果中汇报路径、分支和 diff 摘要，后续 `resume` 会自动沿用同一 worktree。若进程异常终止遗留了孤儿 worktree，可手动清理：
+
+```bash
+git worktree list
+git worktree remove <path>
+git worktree prune
+```
+
+**按次覆盖参数**：主 agent 可以用 `models` 查询可用的聊天模型及其支持的 `thinkingLevels`，用 `query` 或 `provider` 筛选，或用 `limit` 和 `offset` 分页。新建或恢复子会话时，可在 `agent` 调用中传入 `model`（`provider/model-id`）、`thinkingLevel`、`maxTurns` 或 `timeoutSeconds`，仅对本次调用生效。省略的字段先用子代理配置，再继承父会话；显式指定的模型不可用或档位不受支持时，调用会报错。
 
 **添加子代理**：在 `~/.pi/agent/agents/`（全局）或 `.pi/agents/`（项目）下放置 Markdown 文件，文件名即子代理名：
 
@@ -234,6 +244,7 @@ description: 审查代码变更，输出问题清单
 model: anthropic/claude-sonnet-4-5
 effort: low
 maxTurns: 30
+isolation: none
 extensions:
   - pi-web-search
   - mcp
@@ -246,21 +257,26 @@ extensions:
 
 - `description`（必填）：告诉主模型何时使用该子代理。
 - `model` / `effort`：可选，分别设置默认模型和推理档位，省略时继承父会话。`maxTurns` 默认 50。
+- `isolation`：可选，工作目录隔离模式，支持 `none`（默认）或 `worktree`。
 - `tools`：可选，指定启用的内置工具。省略时启用当前平台可用的全部 Pi 内置工具，`worker` 使用这一默认行为。扩展工具仍需通过 `extensions` 启用。
 - `extensions`：可选，为该子代理按白名单开启扩展（如 `mcp`、`pi-web-search` 或扩展路径）。默认不加载任何扩展；`pi-subagent` 自身始终被排除以防止递归。
-- `!command`：可选，写在代码块外、行首的 shell 命令。子代理启动前在当前项目目录执行，输出会提供给子代理。
+- `!command`：可选，写在代码块外、行首的 shell 命令。子代理启动前在其工作目录执行，输出会提供给子代理。
 
-**配置**：编辑 `~/.pi/agent/extensions/subagent.json`，可关闭功能、限制并发数，或按子代理名覆盖其 `model` / `effort` / `maxTurns` / `extensions`：
+**配置**：编辑 `~/.pi/agent/extensions/subagent.json`，可关闭功能、限制并发数、设置默认超时，或按子代理名覆盖其 `model` / `effort` / `maxTurns` / `timeoutSeconds` / `isolation` / `extensions`：
 
 ```json
 {
   "enabled": true,
   "maxConcurrent": 4,
+  "defaultTimeoutSeconds": 600,
   "agents": {
-    "explore": { "effort": "low", "extensions": ["pi-web-search"] }
+    "explore": { "effort": "low", "extensions": ["pi-web-search"] },
+    "worker": { "isolation": "worktree", "timeoutSeconds": 900 }
   }
 }
 ```
+
+- `defaultTimeoutSeconds`：可选，全局默认单次超时时间（秒，省略时不限制）；子代理配置或单次调用的 `timeoutSeconds` 优先级更高。
 
 **命令授权**：执行配置中的 `!` 命令前，可选择拒绝、仅本次允许或信任此版本。在 TUI 中运行 `/subagent-trust` 可搜索可用配置，用 Enter/Space 切换信任、Ctrl+A 全选、Ctrl+X 清空，最后用 Ctrl+S 一次保存全部修改，或用 Esc 放弃修改。命令自动维护 `subagent.json` 中的 `trustedProfiles`；信任绑定文件路径和内容哈希，适用于所有工作目录，文件变化后需要重新授权。当前列表未显示的其他项目配置不受影响。此授权仅针对 `!` 命令，不限制子代理后续使用工具。
 

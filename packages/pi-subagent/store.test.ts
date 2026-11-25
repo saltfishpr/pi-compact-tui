@@ -8,7 +8,7 @@ vi.mock("./logger", () => ({
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-import { SubagentStore } from "./store";
+import { SUBAGENT_RUN_ENTRY_TYPE, SubagentStore } from "./store";
 
 const tempDirs: string[] = [];
 
@@ -148,6 +148,53 @@ describe("SubagentStore", () => {
     expect(restored!.status).toBe("max_turns");
     expect(restored!.persisted).toBe(true);
     expect(store2.loadTranscript(created.childSessionId).length).toBeGreaterThan(0);
+  });
+
+  it("prefers pi-subagent:run entries in the child JSONL over stale parent toolResult details", () => {
+    const root = createTempDir();
+    const cwd = join(root, "workspace");
+    const sessionDir = join(root, "sessions");
+    const parentSm = SessionManager.create(cwd, sessionDir);
+    appendSampleConversation(parentSm, "start", "ok");
+
+    const store1 = new SubagentStore(cwd, parentSm);
+    const created = store1.createSession("worker", "Old title");
+    appendSampleConversation(created.sessionManager, "work", "partial");
+    created.sessionManager.appendCustomEntry(SUBAGENT_RUN_ENTRY_TYPE, {
+      title: "New title",
+      stopReason: "timeout",
+      durationMs: 700,
+    });
+    created.sessionManager.appendCustomEntry(SUBAGENT_RUN_ENTRY_TYPE, {
+      title: "New title",
+      stopReason: "aborted",
+      durationMs: 300,
+    });
+    parentSm.appendMessage({
+      role: "toolResult",
+      toolCallId: "tc-1",
+      toolName: "agent",
+      content: [{ type: "text", text: "old" }],
+      isError: false,
+      timestamp: Date.now(),
+      details: {
+        childSessionId: created.childSessionId,
+        title: "Old title",
+        turns: 99,
+        durationMs: 99999,
+        usage: { input: 9999, output: 9999, cacheRead: 0, cacheWrite: 0, cost: 9 },
+        stopReason: "stop",
+      },
+    });
+
+    const restored = new SubagentStore(cwd, SessionManager.open(parentSm.getSessionFile()!, sessionDir)).get(
+      created.childSessionId,
+    )!;
+    expect(restored.status).toBe("aborted");
+    expect(restored.title).toBe("New title");
+    expect(restored.totalTurns).toBe(1);
+    expect(restored.totalDurationMs).toBe(1000);
+    expect(restored.totalUsage.input).toBe(100);
   });
 
   it("rejects resuming a child session from a forked parent session", () => {

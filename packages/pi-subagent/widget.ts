@@ -80,7 +80,9 @@ class SubagentPanel implements Component {
       const usage = formatUsage(thread.usage);
       if (usage) details.push(`· ${usage}`);
     }
-    return `${this.theme.fg("accent", `${marker} ${thread.name}`)} ${this.theme.fg("muted", details.join(" "))}`;
+    const bgBadge = thread.background ? ` ${this.theme.fg("accent", "[bg]")}` : "";
+    const wtBadge = thread.worktreeBranch ? ` ${this.theme.fg("muted", "[wt]")}` : "";
+    return `${this.theme.fg("accent", `${marker} ${thread.name}`)}${bgBadge}${wtBadge} ${this.theme.fg("muted", details.join(" "))}`;
   }
 
   private renderActivity(thread: AgentThreadSnapshot): string | undefined {

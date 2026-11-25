@@ -222,9 +222,19 @@ When a session is idle, automatically generates a short recap above the input bo
 
 Provides Pi with an `agent` tool for delegating independent subtasks to subagents running in isolated contexts. Four subagents are included: `explore`, `planner`, `reviewer`, and `worker` (can edit/write files and run shell commands); you can add your own as well.
 
-Subagent sessions are persisted per parent session and return a `Child session ID`, so the main model can pass `resume` to follow up or continue a task that hit `maxTurns`. Run `/subagents` (or `/subagents <childSessionId>`) in the TUI to browse subagents and inspect their full message and tool-call transcripts in real time or after completion.
+Subagent sessions are persisted per parent session and return a `Child session ID`, so the main model can pass `resume` to follow up or continue a task that stopped at `maxTurns`, timed out, or failed after partial progress.
 
-**Choose a model per call**: The main agent can use `models` to find the available chat models and their supported `thinkingLevels`. Filter by `query` or `provider`, or pass `limit` and `offset` to page through results. On a new or resumed `agent` call, pass `model` (`provider/model-id`) and/or `thinkingLevel` to override that call only. Omitted values fall back to the subagent's configuration, then the parent session; unavailable models or unsupported thinking levels passed explicitly are rejected.
+**Background execution and `/subagents`**: Pass `background: true` to run a subagent asynchronously and receive an automatic notification when it finishes; the main agent can also inspect status/output, cancel, or steer active subagents. Run `/subagents` (or `/subagents <childSessionId>`) in the TUI to browse subagents, inspect their message and tool-call transcripts in real time or after completion, press `b` to move a running foreground subagent to the background, or press `x` twice to cancel an active subagent.
+
+**Git worktree isolation**: Set `isolation: "worktree"` (per call, in a subagent profile, or in `subagent.json`) to run a subagent in its own Git worktree under `~/.pi/agent/worktrees/` on a dedicated branch—useful when running multiple `worker` subagents in parallel. This requires the project directory to be inside a Git repository with at least one commit. When the subagent finishes, unchanged worktrees and branches are removed automatically; if changes exist, the worktree and branch are kept and reported with path, branch, and diff summary, and `resume` reuses the same worktree. If a process exits abnormally and leaves orphan worktrees behind, clean them up manually with:
+
+```bash
+git worktree list
+git worktree remove <path>
+git worktree prune
+```
+
+**Choose a model per call**: The main agent can use `models` to find the available chat models and their supported `thinkingLevels`. Filter by `query` or `provider`, or pass `limit` and `offset` to page through results. On a new or resumed `agent` call, pass `model` (`provider/model-id`), `thinkingLevel`, `maxTurns`, or `timeoutSeconds` to override that call only. Omitted values fall back to the subagent's configuration, then the parent session; unavailable models or unsupported thinking levels passed explicitly are rejected.
 
 **Add a subagent**: Place a Markdown file in `~/.pi/agent/agents/` (global) or `.pi/agents/` (project). The filename becomes the subagent name:
 
@@ -234,6 +244,7 @@ description: Review code changes and produce a list of issues
 model: anthropic/claude-sonnet-4-5
 effort: low
 maxTurns: 30
+isolation: none
 extensions:
   - pi-web-search
   - mcp
@@ -246,21 +257,26 @@ Write the subagent system prompt here...
 
 - `description` (required): Tells the main model when to use this subagent.
 - `model` / `effort`: Optional defaults for the model and thinking level. Omitted values inherit from the parent session. `maxTurns` defaults to 50.
+- `isolation`: Optional working directory isolation mode, `none` (default) or `worktree`.
 - `tools`: Optional list of built-in tools to enable. Omit it to enable all Pi built-in tools available on the current platform, as `worker` does. Extension tools still require `extensions`.
 - `extensions`: Optional allowlist of extensions to enable for this subagent (e.g., `mcp`, `pi-web-search`, or an extension path). Disabled by default; `pi-subagent` itself is always excluded to prevent recursion.
-- `!command`: Optional shell command at the start of a line (outside code blocks). It runs in the current project directory before the subagent starts; its output is supplied to the subagent.
+- `!command`: Optional shell command at the start of a line (outside code blocks). It runs in the subagent's working directory before the subagent starts; its output is supplied to the subagent.
 
-**Configuration**: Edit `~/.pi/agent/extensions/subagent.json` to disable the feature, limit concurrency, or override `model` / `effort` / `maxTurns` / `extensions` by subagent name:
+**Configuration**: Edit `~/.pi/agent/extensions/subagent.json` to disable the feature, limit concurrency, set a default timeout, or override `model` / `effort` / `maxTurns` / `timeoutSeconds` / `isolation` / `extensions` by subagent name:
 
 ```json
 {
   "enabled": true,
   "maxConcurrent": 4,
+  "defaultTimeoutSeconds": 600,
   "agents": {
-    "explore": { "effort": "low", "extensions": ["pi-web-search"] }
+    "explore": { "effort": "low", "extensions": ["pi-web-search"] },
+    "worker": { "isolation": "worktree", "timeoutSeconds": 900 }
   }
 }
 ```
+
+- `defaultTimeoutSeconds`: Optional default wall-clock timeout in seconds for all subagents (unlimited when omitted). Per-agent `timeoutSeconds` and per-call `timeoutSeconds` take precedence.
 
 **Command approval**: Before a profile's `!` commands run, choose Deny, Allow once, or Trust this version. In the TUI, `/subagent-trust` lists available profiles: search by name, toggle trust with Enter/Space, select all with Ctrl+A, clear with Ctrl+X, then press Ctrl+S to save all changes at once or Esc to discard them. The command maintains `trustedProfiles` in `subagent.json`; trust is tied to the file path and content hash across all working directories, so edits require fresh approval. Profiles from other projects that are not listed are left unchanged. This approval covers only `!` commands, not the subagent's tools.
 

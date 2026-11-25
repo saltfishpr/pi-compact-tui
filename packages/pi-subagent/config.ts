@@ -12,6 +12,8 @@ export const agentOverrideSchema = z.object({
   model: modelSchema.shape.model,
   effort: z.enum(THINKING_LEVELS).optional(),
   maxTurns: z.number().int().positive().optional(),
+  timeoutSeconds: z.number().int().positive().optional(),
+  isolation: z.enum(["none", "worktree"]).optional(),
   extensions: z.array(z.string().min(1)).optional(),
 });
 
@@ -20,6 +22,7 @@ export type AgentOverride = z.infer<typeof agentOverrideSchema>;
 export const subagentConfigSchema = z.object({
   enabled: z.boolean().default(true),
   maxConcurrent: z.number().int().min(1).max(32).default(4),
+  defaultTimeoutSeconds: z.number().int().positive().optional(),
   agents: z.record(z.string().min(1), agentOverrideSchema).default({}),
   trustedProfiles: z
     .array(
