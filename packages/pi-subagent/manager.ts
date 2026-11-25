@@ -15,7 +15,9 @@ import { logger } from "./logger";
 import {
   addUsageTotals,
   diffUsageTotals,
+  stopReasonToStatus,
   SUBAGENT_RUN_ENTRY_TYPE,
+  type SpawnStopReason,
   type SubagentActivity,
   type SubagentRunEntryData,
   type SubagentStatus,
@@ -29,7 +31,7 @@ import {
   type WorktreeSummary,
 } from "./worktree";
 
-export type SpawnStopReason = "stop" | "aborted" | "max_turns" | "timeout" | "error";
+export type { SpawnStopReason } from "./store";
 
 export const MAX_TOOL_TRACE_ENTRIES = 50;
 export const MAX_TOOL_TRACE_SUMMARY_LENGTH = 100;
@@ -306,7 +308,7 @@ class AgentThread {
     this.onFinished(this.childSessionId);
 
     this.store?.update(this.childSessionId, (record) => {
-      record.status = result.stopReason === "stop" ? "completed" : result.stopReason;
+      record.status = stopReasonToStatus(result.stopReason);
       record.title = this.request.title;
       record.background = result.background;
       record.timeoutSeconds = this.request.timeoutSeconds;
@@ -767,7 +769,7 @@ export class SubagentManager {
     }
     const last = this.lastResults.get(childSessionId);
     if (last) {
-      const status: SubagentStatus = last.result.stopReason === "stop" ? "completed" : last.result.stopReason;
+      const status: SubagentStatus = stopReasonToStatus(last.result.stopReason);
       return { ok: false, reason: "not_active", status };
     }
     return { ok: false, reason: "not_found" };

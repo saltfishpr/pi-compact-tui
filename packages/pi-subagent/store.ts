@@ -16,7 +16,13 @@ import type { SubagentWorktreeState } from "./worktree";
 export const SUBAGENT_META_ENTRY_TYPE = "pi-subagent:meta";
 export const SUBAGENT_RUN_ENTRY_TYPE = "pi-subagent:run";
 
+export type SpawnStopReason = "stop" | "aborted" | "max_turns" | "timeout" | "error";
+
 export type SubagentStatus = "pending" | "running" | "completed" | "max_turns" | "timeout" | "aborted" | "error";
+
+export function stopReasonToStatus(stopReason: SpawnStopReason): SubagentStatus {
+  return stopReason === "stop" ? "completed" : stopReason;
+}
 
 export type SubagentActivity =
   | { type: "text"; text: string }
@@ -30,7 +36,7 @@ export interface SubagentMetaEntryData {
 /** 每次运行收尾时写入子会话 JSONL；重启后以它为准，不依赖父会话 toolResult。 */
 export interface SubagentRunEntryData {
   title: string;
-  stopReason: "stop" | "aborted" | "max_turns" | "timeout" | "error";
+  stopReason: SpawnStopReason;
   durationMs: number;
   model?: string;
   errorMessage?: string;

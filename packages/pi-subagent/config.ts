@@ -1,6 +1,7 @@
 import * as z from "zod";
 
 import { getGlobalConfigPath, loadJSONConfig, modelSchema, THINKING_LEVELS } from "../pi-common";
+import { ISOLATION_MODES } from "./worktree";
 
 const CONFIG_FILE_NAME = "subagent.json";
 
@@ -13,7 +14,7 @@ export const agentOverrideSchema = z.object({
   effort: z.enum(THINKING_LEVELS).optional(),
   maxTurns: z.number().int().positive().optional(),
   timeoutSeconds: z.number().int().positive().optional(),
-  isolation: z.enum(["none", "worktree"]).optional(),
+  isolation: z.enum(ISOLATION_MODES).optional(),
   extensions: z.array(z.string().min(1)).optional(),
 });
 

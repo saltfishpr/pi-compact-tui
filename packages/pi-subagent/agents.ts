@@ -5,6 +5,7 @@ import { basename, join, sep } from "node:path";
 import * as z from "zod";
 
 import { modelSchema, THINKING_LEVELS } from "../pi-common";
+import { ISOLATION_MODES } from "./worktree";
 
 const BUILTIN_AGENTS_DIR = join(import.meta.dirname, "agents");
 const GLOBAL_AGENTS_DIR = join(getAgentDir(), "agents");
@@ -17,7 +18,7 @@ const frontmatterSchema = z.object({
   model: modelSchema.shape.model,
   effort: z.enum(THINKING_LEVELS).optional(),
   maxTurns: z.number().int().positive().default(50),
-  isolation: z.enum(["none", "worktree"]).optional(),
+  isolation: z.enum(ISOLATION_MODES).optional(),
 });
 
 type AgentFrontmatter = z.infer<typeof frontmatterSchema>;

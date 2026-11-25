@@ -12,7 +12,9 @@ const MAX_COMMITS = 20;
 const MAX_DIFF_STAT_LINES = 40;
 const MAX_UNTRACKED_FILES = 30;
 
-export type IsolationMode = "none" | "worktree";
+export const ISOLATION_MODES = ["none", "worktree"] as const;
+
+export type IsolationMode = (typeof ISOLATION_MODES)[number];
 
 export interface SubagentWorktreeState {
   repoRoot: string;

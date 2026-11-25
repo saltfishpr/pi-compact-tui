@@ -342,17 +342,7 @@ class SubagentsInspectorComponent implements Component {
       return;
     }
 
-    if (this.pendingCancel) {
-      if (data === "x") {
-        const targetId = this.pendingCancel.childSessionId;
-        this.pendingCancel = undefined;
-        void this.manager.cancel(targetId, { notify: true });
-      } else {
-        this.pendingCancel = undefined;
-      }
-      this.refresh();
-      return;
-    }
+    if (this.handlePendingCancelInput(data)) return;
 
     if (data === "q" || this.keybindings.matches(data, "tui.select.cancel")) {
       if (this.filterQuery && data !== "q") {
@@ -413,18 +403,29 @@ class SubagentsInspectorComponent implements Component {
     }
   }
 
-  private handleDetailInput(data: string): void {
-    if (this.pendingCancel) {
-      if (data === "x") {
-        const targetId = this.pendingCancel.childSessionId;
-        this.pendingCancel = undefined;
-        void this.manager.cancel(targetId, { notify: true });
-      } else {
-        this.pendingCancel = undefined;
-      }
-      this.refresh();
-      return;
+  private handlePendingCancelInput(data: string): boolean {
+    if (!this.pendingCancel) return false;
+    if (data === "x") {
+      const targetId = this.pendingCancel.childSessionId;
+      this.pendingCancel = undefined;
+      void this.manager.cancel(targetId, { notify: true });
+    } else {
+      this.pendingCancel = undefined;
     }
+    this.refresh();
+    return true;
+  }
+
+  private renderPendingCancelLine(width: number): string {
+    const prompt = this.theme.fg(
+      "warning",
+      `Press x again to cancel "${this.pendingCancel!.title}" (Esc to keep running)`,
+    );
+    return truncateToWidth(` ${prompt}`, width);
+  }
+
+  private handleDetailInput(data: string): void {
+    if (this.handlePendingCancelInput(data)) return;
 
     if (data === "q") {
       this.close();
@@ -590,11 +591,7 @@ class SubagentsInspectorComponent implements Component {
 
     lines.push("");
     if (this.pendingCancel) {
-      const prompt = this.theme.fg(
-        "warning",
-        `Press x again to cancel "${this.pendingCancel.title}" (Esc to keep running)`,
-      );
-      lines.push(truncateToWidth(` ${prompt}`, width));
+      lines.push(this.renderPendingCancelLine(width));
     } else {
       const selected = records[this.selectedIndex];
       const selectedSnapshot = selected ? this.manager.getSnapshot(selected.childSessionId) : undefined;
@@ -708,11 +705,7 @@ class SubagentsInspectorComponent implements Component {
 
     lines.push("");
     if (this.pendingCancel) {
-      const prompt = this.theme.fg(
-        "warning",
-        `Press x again to cancel "${this.pendingCancel.title}" (Esc to keep running)`,
-      );
-      lines.push(truncateToWidth(` ${prompt}`, width));
+      lines.push(this.renderPendingCancelLine(width));
     } else {
       const scrollInfo =
         maxScrollTop > 0
